@@ -1,0 +1,216 @@
+with final as (
+Select 
+		  a.account_name
+		, a.account_id   
+		, a.app_name
+		, a.app_id
+		, a.subscription_type
+		, a.number_of_employees
+		, d.new_account_number_of_employees
+		, c.account_region
+		, a.billing_country
+		, a.billing_state
+		, a.industry_primary
+		, a.price_plan
+		, a.subscriptipn_cancellation_requested_at
+		, a.subscription_cancelled_at
+		, a.subscription_id
+		, a.sales_provisioned_ever
+		, b.account_owner
+		, b.account_owner_role
+		, c.is_ae_hold_account
+		, NVL(a.contracted_arr,CASE WHEN subscription_id = 0 THEN eop_arr END,CASE WHEN subscription_type IN ('annual_primary') THEN a.baseline_arr END) as clean_contracted_arr
+		, CASE WHEN new_account_number_of_employees is not null then d.new_company_reporting_segment ELSE d.old_company_reporting_segment END as company_reporting_segment
+		, CASE WHEN new_account_number_of_employees is not null then new_account_number_of_employees ELSE a.number_of_employees END as refreshed_fte
+				
+
+		, CASE WHEN a.is_cgae_transitioned_account = TRUE THEN 1 ELSE 0 END as is_cgae_transitioned_account
+		, CASE WHEN a.sales_managed_detail is NOT NULL THEN a.sales_managed_detail  
+   			   WHEN (b.is_rm_named_account = TRUE or b.is_new_rm_named_account = TRUE) and (b.account_owner_role ilike '%rm%' and b.account_owner_role not ilike '%growth%') THEN 'rm_managed'
+   			   WHEN a.sales_managed_detail is NULL THEN 'self-serve'
+			ELSE NULL END as current_sales_managed_detail  
+		
+		,CASE  
+			  WHEN subscription_type = 'annual_primary' and (refreshed_fte > 100 or clean_contracted_arr >= 15000) THEN 'rm_managed'
+			 	WHEN current_sales_managed_detail = 'rm_managed' and CASE WHEN subscriptipn_cancellation_requested_at<subscription_cancelled_at THEN subscriptipn_cancellation_requested_at ELSE subscription_cancelled_at END < '2022-10-1' THEN 'rm_managed'
+				WHEN current_sales_managed_detail = 'scaled_customer_managed' and CASE WHEN subscriptipn_cancellation_requested_at<subscription_cancelled_at THEN subscriptipn_cancellation_requested_at ELSE subscription_cancelled_at END < '2022-10-1' THEN 'scaled_customer_managed'
+			  WHEN subscription_type = 'annual_primary' and (refreshed_fte <= 100 or clean_contracted_arr < 15000) THEN 'scaled_customer_managed'
+			  WHEN subscription_type = 'monthly' and current_sales_managed_detail = 'rm_managed' and (refreshed_fte > 100 or clean_contracted_arr >= 15000) THEN 'rm_managed'
+			  WHEN subscription_type = 'monthly' and current_sales_managed_detail = 'scaled_customer_managed' and (refreshed_fte <= 100 or clean_contracted_arr < 15000) THEN 'scaled_customer_managed'
+			  WHEN subscription_type in ('monthly','self_serve_annual') and a.eop_arr >= 15000 THEN 'CGRM2'
+  			  WHEN subscription_type in ('monthly','self_serve_annual') and a.eop_arr < 15000 THEN 'self-serve'
+			  ELSE NULL
+			END as upcoming_sales_managed_detail  
+		
+		, a.eop_arr
+		
+		, e.opportunity_ids
+		, e.oppty_type
+		, e.opportunity_renewal_risk
+		, e.opportunity_renewal_risk_type
+		, e.contracted_net_expansion
+		
+		, opportunity_good_faith_negotiation
+		, opportunity_good_faith_negotiation_status
+		, opportunity_good_faith_negotiation_notes
+		
+		,CASE WHEN a.contract_end_date_adj >= '2022-08-01' and a.contract_end_date_adj <= '2023-01-31' THEN a.contract_end_date_adj ELSE NULL END as max_contract_end_date_adj
+		
+From dw.finance_analysis_apps_comprehensive_build a
+Left Join (SELECT account_id,new_account_number_of_employees,new_company_reporting_segment,old_company_reporting_segment from reports.employee_count_refresh where employee_count_changed IS NOT NULL) d on a.account_id = d.account_id 
+Left Join dw.sales_accounts b on a.app_id = b.app_id
+Left Join base.salesforce_account c on a.account_id = c.account_id 
+Left Join (
+			Select 
+					a.account_id
+				  , listagg(DISTINCT b.opportunity_id,',') as opportunity_ids
+				  , listagg(DISTINCT CASE WHEN oppty_record_type_name = 'Renewal' THEN 'Renewal' ELSE 'Amendment' END,',') as oppty_type
+			  	  , listagg(DISTINCT opportunity_renewal_risk,',') 			as opportunity_renewal_risk
+				  , listagg(DISTINCT opportunity_renewal_risk_type,',') 	as opportunity_renewal_risk_type
+				  , SUM(CASE WHEN opportunity_good_faith_negotiation is TRUE THEN 1 ELSE 0 END) as opportunity_good_faith_negotiation				
+  				  , Listagg(DISTINCT opportunity_good_faith_negotiation_status,',') as opportunity_good_faith_negotiation_status
+				  , Listagg(DISTINCT opportunity_good_faith_negotiation_notes,',') as opportunity_good_faith_negotiation_notes
+				  , MAX(CASE WHEN contract_expiration_date <= '2023-01-31' THEN contract_expiration_date ELSE NULL END) as max_contract_expiration_date
+				  --, listagg(DISTINCT b.s,',') as opportunity_ids
+				  , SUM(a.oppty_contracted_net_expansion_arr) as contracted_net_expansion
+			From base.salesforce_opportunity b
+				Left Join dw.sales_opportunities a on a.oppty_id = b.opportunity_id 
+				Where (is_amendment = TRUE or oppty_record_type_name = 'Renewal')
+				and a.is_closed != TRUE
+				--and contract_expiration_date >= '2022-08-01' 
+				Group by 1
+			) e on a.account_id = e.account_id
+Where 1=1
+	AND date = '2022-08-01'
+	AND subscription_type != 'annual_secondary'
+	and a.account_id = '0015c000021MVgLAAW'
+--	and a.app_id = '1779930'
+),
+
+grouping_at_account_level as (
+
+Select
+ 	  account_name
+ 	, account_id 
+ 	, account_owner
+ 	, account_owner_role
+ 	, is_ae_hold_account
+ 	, opportunity_ids
+	, oppty_type
+	, opportunity_renewal_risk
+	, opportunity_renewal_risk_type
+	, company_reporting_segment
+	, opportunity_good_faith_negotiation
+	, opportunity_good_faith_negotiation_status
+	, opportunity_good_faith_negotiation_notes
+
+	, 1 as one
+	, NVL(contracted_net_expansion,0) 							as contracted_net_expansion
+	, MAX(max_contract_end_date_adj)  							as max_contract_expiration_date
+ 	, listagg(DISTINCT app_name,', ') 							as app_names
+ 	, listagg(DISTINCT app_id,', ') 							as app_ids
+ 	, listagg(DISTINCT subscription_type,', ') 					as subscription_types
+ 	, MAX(refreshed_fte)					 					as refreshed_fte
+ 	, listagg(DISTINCT account_region,', ') 					as salesforce_account_region
+ 	, listagg(DISTINCT billing_country,', ') 					as billing_country
+ 	, listagg(DISTINCT billing_state,', ') 						as billing_state
+ 	, listagg(DISTINCT industry_primary,', ') 					as industry_primary
+ 	, listagg(DISTINCT current_sales_managed_detail,', ') 		as current_sales_managed_details
+ 	, listagg(DISTINCT upcoming_sales_managed_detail,', ') 		as upcoming_sales_managed_detail
+
+	, listagg(DISTINCT subscriptipn_cancellation_requested_at,', ') 		as subscriptipn_cancellation_requested_ats
+	, listagg(DISTINCT subscription_cancelled_at,', ') 						as subscription_cancelled_ats
+	, listagg(DISTINCT subscription_id,', ')								as subscription_ids
+ 	 
+ 	, CASE WHEN listagg(DISTINCT upcoming_sales_managed_detail,', ') = 'self-serve' THEN 'self-serve'		
+   		   WHEN listagg(DISTINCT upcoming_sales_managed_detail,', ') ILIKE '%rm_managed%' THEN 'rm_managed'
+		   WHEN listagg(DISTINCT upcoming_sales_managed_detail,', ') = 'rm_managed' THEN 'rm_managed'
+		   WHEN listagg(DISTINCT upcoming_sales_managed_detail,', ') ILIKE '%scaled_customer_managed%' THEN 'scaled_customer_managed'	   		
+		   WHEN listagg(DISTINCT upcoming_sales_managed_detail,', ') ILIKE '%CGRM2%' THEN 'CGRM2'
+		   ELSE 'other'	   		 	
+ 			END AS upcoming_sales_managed_details
+	, CASE WHEN (current_sales_managed_details = 'self-serve' and upcoming_sales_managed_details = 'self-serve') THEN TRUE ELSE FALSE END as stays_self_serve
+ 	
+ 	, SUM(is_cgae_transitioned_account) 						as is_cgae_transitioned_accounts
+ 	, SUM(eop_arr) 												as eop_arr
+ 	, SUM(NVL(clean_contracted_arr,0)) 							as clean_contracted_arr
+From final 
+Where 1=1
+--and account_id = '0011N000017TRx5QAG'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+),
+
+union_ids as (
+	Select account_id from grouping_at_account_level
+	UNION DISTINCT
+	SELECT account_id FROM dw.finance_dim_accounts_rm_nal_logs Where 1=1 AND nal_period = 'H2-2023' AND starting_nal_log = TRUE
+),
+		
+final_audit_cte as (		
+
+Select 
+	   NVL(bcr.account_id,nal.account_id) as account_id_clean
+	  --,nal2.account_id as tmp_account_id
+	  ,bcr.current_sales_managed_details as previous_cohort
+	  ,bcr.upcoming_sales_managed_details as analytics_cohort_recommendation
+	  ,bcr.subscription_cancelled_ats
+	  ,bcr.subscriptipn_cancellation_requested_ats
+	  ,bcr.subscription_ids
+	  ,bcr.clean_contracted_arr
+	  ,bcr.refreshed_fte
+	  ,bcr.eop_arr
+      ,nal.nal_start_date
+	  ,nal.nal_period
+	  ,nal.starting_nal_log
+	  ,nal.sales_managed_detail
+	  ,nal.nal_owner_role_at_assignment
+
+
+/*      ,NVL(nal.nal_start_date,nal2.nal_start_date) 								as nal_start_date_clean
+	  ,NVL(nal.nal_period,nal2.nal_period) 										as nal_period_clean
+	  ,NVL(nal.starting_nal_log,nal2.starting_nal_log) 							as starting_nal_log_clean
+	  ,NVL(nal.sales_managed_detail,nal2.sales_managed_detail) 					as sales_managed_detail
+	  ,NVL(nal.nal_owner_role_at_assignment,nal2.nal_owner_role_at_assignment) 	as nal_owner_role_at_assignment
+*/
+	  ,CASE 
+	  		WHEN analytics_cohort_recommendation = 'self-serve' and nal.sales_managed_detail IS NULL THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation = 'CGRM2' and nal.sales_managed_detail IS NULL THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and analytics_cohort_recommendation = nal.sales_managed_detail THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.nal_period is not null and nal.sales_managed_detail IS NULL THEN 'issue, fix nal owner role'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.nal_period is not null and nal.sales_managed_detail IS NULL THEN 'issue, fix nal owner role'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.sales_managed_detail IS NOT NULL THEN 'issue, business justification required'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.sales_managed_detail IS NULL  THEN 'issue, business justification required'
+	  		WHEN analytics_cohort_recommendation is NULL and nal.sales_managed_detail IS NOT NULL THEN 'issue, business justification required'
+	  		WHEN eop_arr IS NULL THEN 'no issue'
+	  		ELSE 'other'
+	  		END as nal_record_issue_flag
+	  		
+	  		
+	  ,CASE 
+	  		WHEN analytics_cohort_recommendation = 'self-serve' and nal.sales_managed_detail IS NULL THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation = 'CGRM2' and nal.sales_managed_detail IS NULL THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and analytics_cohort_recommendation = nal.sales_managed_detail THEN 'no issue'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.nal_period is not null and nal.sales_managed_detail IS NULL THEN 'starting nal record exists but user role is in uningestible format'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.sales_managed_detail IS NULL  THEN 'starting nal record does not exist despite analytics recommendation'
+	  		WHEN analytics_cohort_recommendation is NOT NULL and nal.sales_managed_detail IS NOT NULL  THEN 'starting nal record exists but the segment is misaligned rm vs scm'
+	  		WHEN analytics_cohort_recommendation is NULL and nal.sales_managed_detail IS NOT NULL THEN 'starting nal record exists despite analytics recommendation'
+	  		WHEN eop_arr IS NULL THEN 'churned previously'
+	  		ELSE 'other'
+	  		END as nal_record_issue_desc 
+
+--		,row_number() over(partition by account_id_clean) as account_rank
+	  		
+From union_ids ui
+LEFT JOIN grouping_at_account_level bcr on ui.account_id = bcr.account_id
+LEFT JOIN (SELECT * From dw.finance_dim_accounts_rm_nal_logs Where 1=1 AND nal_period = 'H2-2023' AND starting_nal_log = TRUE) nal on ui.account_id = nal.account_id
+--RIGHT JOIN (SELECT b.* FROM base.salesforce_account a left join dw.finance_dim_accounts_rm_nal_logs b on a.account_id = b.account_id Where 1=1 AND nal_period = 'H2-2023' AND starting_nal_log = TRUE) nal2 on bcr.account_id = nal2.account_id
+--Full Outer Join (SELECT * FROM base.salesforce_account a left join dw.finance_dim_accounts_rm_nal_logs b on a.account_id = b.account_id Where 1=1 AND nal_period = 'H2-2023' AND starting_nal_log = TRUE) nal3 on bcr.account_id = nal.account_id
+Where 1=1
+
+)
+
+Select 
+*
+From final_audit_cte
+Where 1=1
+and nal_record_issue_flag != 'no issue' ;
