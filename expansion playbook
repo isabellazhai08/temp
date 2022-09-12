@@ -1,0 +1,932 @@
+with look_alike as (
+				Select 
+					   	d.sf_account_name
+					   ,d.company_reporting_segment
+					   ,e.eop_arr
+					   ,a.app_id
+					   ,c.date as upgrade_date
+					   ,a.product_grouping
+					   ,a.product_tier 					as current_product_tier
+					   ,c.product_tier 					as previous_product_tier 
+					   ,Case when e.eop_arr >= 200000 THEN '$200k+'
+					   		 when e.eop_arr >= 100000 THEN '$100k+'
+				 	   		 when e.eop_arr >= 50000 THEN '$50k+'
+							 when e.eop_arr >= 25000 THEN '$25k+'
+							ELSE '$0k+' 
+						END as eop_arr_range
+						,e.industry_primary
+						,row_number() Over (partition by e.industry_primary Order by eop_arr DESC) as industry_rank
+						,row_number() Over (partition by e.company_reporting_segment Order by eop_arr DESC) as crs_rank
+				From (Select * From dw.finance_analysis_product_arr Where product_grouping IN ('Inbox','Messages') and product_tier = 'Premium' and date = '2022-07-27') a
+					Left Join (Select app_id,max(date) as date From dw.finance_analysis_product_arr Where product_grouping IN ('Inbox','Messages') and product_tier <> 'Premium' Group by 1) b on a.app_id = b.app_id 
+					Left Join (Select date,app_id,product_tier From dw.finance_analysis_product_arr Where product_grouping IN ('Inbox','Messages') and product_tier <> 'Premium') c on a.app_id = c.app_id and b.date = c.date
+					Left Join (Select * From dw.apps) d on a.app_id = d.id 
+					Left Join (Select * From dw.finance_analysis_apps_comprehensive_build Where date = '2022-08-02') e on a.app_id = e.app_id
+				Where 1=1
+				--and  a.app_id = '1178931'
+				and previous_product_tier is not null
+				Order by e.industry_primary,eop_arr DESC 
+				
+				)
+				,
+				
+				look_alike_final as (
+				
+					Select 
+						  Distinct 
+						  app_id
+						 ,product_grouping
+						 ,industry_primary
+						 ,company_reporting_segment
+						 ,industry_rank
+						 ,crs_rank
+						 ,ROUND((eop_arr/1000),1)::VARCHAR  as round_eop_arr
+						 ,'Account Name: ' || sf_account_name || '  App ID: ' || app_id ||'  Billing ARR: $'::VARCHAR|| round(round_eop_arr,2)||'K'::VARCHAR as account_name_and_spend
+					From look_alike 
+					Where 1=1
+				)
+,apps as (
+  Select 
+		--account_information 
+		  bsa.account_region
+		, bsu.user_name as account_owner
+		, cb.account_name
+		, cb.account_id
+		, cb.industry_primary
+		, cb.company_reporting_segment
+		, bsu.user_role_name
+		
+		--app and price plan info
+		, cb.date
+		, cb.app_id
+		, cb.app_name
+		, cb.subscription_type
+		, cb.price_plan_group
+		, cb.price_plan
+		
+		--ppp upsell potential stats for pro to premium
+		,CASE WHEN  cb.price_plan_group = 'ppp' THEN ula.minimum_agent_count   														--PPP
+			  WHEN (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') THEN ula.minimum_agent_count 		--vbp1x
+	    	  WHEN (cb.price_plan='value_based_pricing_feb2022' or cb.price_plan='value_based_pricing_mar2021' or cb.price_plan='value_based_pricing_mar2021_early_stage') THEN ula.vbp2_seats_limit 	--vbp2x
+		 	END as seat_limit		
+
+		, CASE WHEN  ug.current_seats_usage >= ISNULL(seat_limit,0) THEN ug.current_seats_usage
+			  WHEN  ug.current_seats_usage < ISNULL(seat_limit,0) THEN seat_limit
+			END AS max_seat_usage_or_limit		
+		
+		,CASE WHEN cb.price_plan_group = 'ppp' THEN minimum_active_people_count
+			  WHEN (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') THEN thirty_day_messaged_contacts
+	    	  WHEN (cb.price_plan='value_based_pricing_feb2022' or cb.price_plan='value_based_pricing_mar2021' or cb.price_plan='value_based_pricing_mar2021_early_stage') THEN thirty_day_messaged_contacts
+		 	END as people_limit
+		 	
+		, CASE WHEN ug.current_people_usage >= people_limit THEN ug.current_people_usage
+	 		  WHEN ug.current_people_usage < people_limit THEN people_limit
+  		 	END as max_people_usage_or_limit
+
+		
+		, CASE WHEN cb.price_plan_group = 'ppp' and cb.inbox_tier = 'Standard' THEN (19*12)
+		   	  WHEN cb.price_plan_group = 'ppp' and cb.inbox_tier = 'Pro' THEN (39*12)
+			END as current_annual_cost_per_seat
+		
+		, current_annual_cost_per_seat * max_seat_usage_or_limit as current_annual_cost_for_total_seats
+		
+		, CASE WHEN max_seat_usage_or_limit >= 5 THEN max_seat_usage_or_limit
+			ELSE 0 END * (150*12) as premium_annual_cost_for_total_seats
+		
+		, premium_annual_cost_for_total_seats - current_annual_cost_for_total_seats as net_premium_vs_current
+		
+		, CASE WHEN net_premium_vs_current < 0 THEN 0 
+			ELSE net_premium_vs_current END as premium_upsell_potential
+		
+		
+		--billing info
+		, cb.eop_arr
+		
+		--usage limits and stats
+			--People Metrics for each price plan
+			, ula.minimum_active_people_count
+			, ula.thirty_day_messaged_contacts 								as minimum_people_reached
+			, ula.thirty_day_messaged_contacts_product_tours 				as minimum_guided_users
+	
+			
+			, ug.current_seats_usage
+			, ug.current_people_usage
+			, ug.seats_usage_90_lead
+			, ug.people_usage_90_lead
+		
+		
+		--price grid table info 
+		, CASE WHEN ptaa.inbox = '' THEN 'No Sub'
+			   WHEN ptaa.inbox != '' THEN ptaa.inbox 
+		   END as Inbox
+		   
+		, CASE WHEN ptaa.Messages = '' THEN 'No Sub'
+			   WHEN ptaa.Messages != '' THEN ptaa.Messages 
+		   END as Messages
+		   
+		, CASE WHEN ptaa.Articles = '' THEN 'No Sub'
+			   WHEN ptaa.Articles != '' THEN ptaa.Articles 
+		   END as Articles
+		   
+		, CASE WHEN ptaa.Custom_Bots = '' THEN 'No Sub'
+			   WHEN ptaa.Custom_Bots != '' THEN ptaa.Custom_Bots
+		   END as Custom_Bots
+
+		, CASE WHEN ptaa.Resolution_Bot = '' AND hvs.support_segment = 'High Volume' THEN 'Potential Opp'
+			   WHEN ptaa.Resolution_Bot = '' THEN 'No Sub'
+			   WHEN ptaa.Resolution_Bot != '' THEN ptaa.Resolution_Bot
+		   END as Resolution_Bot
+   
+		, CASE WHEN ptaa.Product_Tours = '' and aoe.product_tours_eligibility_app ILIKE '%product_tours%' THEN 'Potential Opp'
+			   WHEN ptaa.Product_Tours = '' THEN 'No Sub'
+			   WHEN ptaa.Product_Tours != '' THEN ptaa.Product_Tours
+		   END as Product_Tours
+
+		, CASE WHEN ptaa.Whatsapp = '' and aoe.whatsapp_eligibility_app ILIKE '%whatsapp%' THEN 'Potential Opp'
+			   WHEN ptaa.Whatsapp = '' THEN 'No Sub'
+			   WHEN ptaa.Whatsapp != '' THEN ptaa.Whatsapp
+		   END as Whatsapp		   
+
+		, CASE WHEN ptaa.Surveys = '' and aoe.surveys_eligibility_app ILIKE '%surveys%' THEN 'Potential Opp'
+			   WHEN ptaa.Surveys = '' THEN 'No Sub'
+			   WHEN ptaa.Surveys != '' THEN ptaa.Surveys
+		   END as Surveys
+
+		, CASE --WHEN ptaa.Switch = '' and aoe.switch_eligibility_app ILIKE '%switch%' THEN 'Potential Opp'
+			   WHEN ptaa.Switch = '' THEN 'No Sub'
+			   WHEN ptaa.Switch != '' THEN ptaa.Switch
+		   END as Switch
+		   
+		, CASE WHEN ptaa.SMS = '' and aoe.sms_eligibility_app ILIKE '%sms%' THEN 'Potential Opp'
+			   WHEN ptaa.SMS = '' THEN 'No Sub'
+			   WHEN ptaa.SMS != '' THEN ptaa.SMS
+		   END as SMS
+
+		, CASE WHEN ptaa.vbp_1x_core_tier = '' THEN 'No Sub'	
+			   WHEN ptaa.vbp_1x_core_tier != '' THEN ptaa.vbp_1x_core_tier
+   		   END as vbp_1x_core_tier
+
+		, CASE WHEN ptaa.advanced_engage = '' THEN 'No Sub'	
+			   WHEN ptaa.advanced_engage != '' THEN ptaa.advanced_engage
+   		   END as advanced_engage
+
+		, CASE WHEN ptaa.advanced_lead_gen = '' THEN 'No Sub'	
+			   WHEN ptaa.advanced_lead_gen != '' THEN ptaa.advanced_lead_gen
+   		   END as advanced_lead_gen
+   		   
+		, CASE WHEN ptaa.advanced_support = '' AND hvs.support_segment = 'High Volume' THEN 'Potential Opp'
+			   WHEN ptaa.advanced_support = '' THEN 'No Sub'	
+			   WHEN ptaa.advanced_support != '' THEN ptaa.advanced_support
+   		   END as advanced_support
+   		  
+   		  
+   		  
+		--Engage Fields
+		, CASE WHEN ptaa.vbp2_engage_tier = '' THEN 'No Sub'
+			   WHEN ptaa.vbp2_engage_tier != '' THEN ptaa.vbp2_engage_tier 
+		   END as vbp2_engage	
+		   
+		,CASE WHEN  cb.price_plan_group = 'ppp' AND ptaa.Messages != '' THEN 'Messages'
+			  WHEN (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') and ptaa.vbp_1x_core_tier != '' THEN 'VBP1x Core'
+	    	  WHEN (cb.price_plan='value_based_pricing_feb2022' or cb.price_plan='value_based_pricing_mar2021' or cb.price_plan='value_based_pricing_mar2021_early_stage') AND ptaa.vbp2_engage_tier != '' THEN 'Engage' 	--vbp2x
+	    	  ELSE 'No Sub'
+		 	END as has_engage
+		 	
+		,CASE WHEN  cb.price_plan_group = 'ppp' AND ptaa.Messages != '' THEN ptaa.Messages 																	 																		--ppp
+			  WHEN (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') and ptaa.vbp_1x_core_tier != '' THEN ptaa.vbp_1x_core_tier
+	    	  WHEN (cb.price_plan='value_based_pricing_feb2022' or cb.price_plan='value_based_pricing_mar2021' or cb.price_plan='value_based_pricing_mar2021_early_stage') AND ptaa.vbp2_engage_tier != '' THEN ptaa.vbp2_engage_tier 	--vbp2x
+	    	  ELSE 'No Sub'		 	
+		 	END as enage_tier 
+
+		,CASE 
+			  WHEN enage_tier = 'No Sub' THEN 'No Sub'
+			  WHEN cb.price_plan_group = 'ppp' AND ptaa.Messages = 'Premium' THEN 'Max Tier - No Upsell' 
+			  WHEN (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') and ptaa.vbp_1x_core_tier = 'Scale' THEN 'Max Tier - No Upsell' 
+	    	  WHEN (cb.price_plan='value_based_pricing_feb2022' or cb.price_plan='value_based_pricing_mar2021' or cb.price_plan='value_based_pricing_mar2021_early_stage') AND ptaa.vbp2_engage_tier = 'Premium' THEN 'Max Tier - No Upsell' 
+	    	  ELSE 'Upsell Potential'		 	
+		 	END as engage_tier_tag		   
+   		   
+   		   
+   		, CASE WHEN hvs.support_segment = 'High Volume' THEN TRUE ELSE FALSE END as has_high_volume_support
+   		   		
+		--price_tier_and_add_ons_eop_arr
+		, ptaa.inbox_arr
+		, ptaa.messages_arr
+		, ptaa.articles_arr
+		, ptaa.custom_bots_arr
+		, ptaa.resolution_bot_arr
+		, ptaa.product_tours_arr
+		, ptaa.whatsapp_arr
+		, ptaa.surveys_arr
+		, ptaa.switch_arr
+		
+		, ptaa.vbp_1x_core_tier_arr
+		, ptaa.advanced_engage_arr
+		, ptaa.advanced_lead_gen_arr
+		, ptaa.advanced_support_arr
+		
+		
+		--pricing usage by tier table 
+		, pppp.active_people_lower_range
+		, pppp.active_people_upper_range
+		, pppp.ap_range
+		, pppp.essential 				as messages_essential_monthly_cost
+		, pppp.pro 						as messages_pro_monthly_cost
+		, pppp.premium 					as messages_premium_monthly_cost
+		, pppp.product_tours 			as product_tours_monthly_cost
+		, pppp.custom_bots 		  		as custom_bots_monthly_cost
+		, pppp.resolution_bot 	 		as resolution_bot_monthly_cost
+		
+		, vbpp.people_reached_lower_range
+		, vbpp.people_reached_upper_range
+		, vbpp.core_packages 			as vbp_1x_core_packages_monthly_cost
+		, vbpp.adv_cust_eng 				as vbp_1x_adv_cust_eng_monthly_cost
+		, vbpp.core_and_adv_cust_eng 	as vbp_1x_core_and_adv_cust_eng_monthly_cost
+		
+				
+		, aoe.sms_eligibility_app
+		, aoe.whatsapp_eligibility_app
+		--, aoe.switch_eligibility_app
+		, aoe.surveys_eligibility_app
+		, aoe.product_tours_eligibility_app
+		
+		, hs.customer_health_score
+		, hs.customer_health_points
+		
+		, hvs.support_segment as support_segment_bool
+
+		--look alike model
+		,Case WHEN laindi.product_grouping = 'Inbox' THEN laindi.industry_pro_to_premium_look_alike_set END as inbox_industry_pro_to_premium_upgrade
+		,Case WHEN laindm.product_grouping = 'Messages' THEN laindm.industry_pro_to_premium_look_alike_set END as messages_industry_pro_to_premium_upgrade
+		,Case WHEN lacrsi.product_grouping = 'Inbox' THEN lacrsi.crs_pro_to_premium_look_alike_set END as inbox_crs_pro_to_premium_upgrade
+		,Case WHEN lacrsm.product_grouping = 'Messages' THEN lacrsm.crs_pro_to_premium_look_alike_set END as messages_crs_pro_to_premium_upgrade
+		
+		
+		--eqa metrics
+		,eqa.EQA_agr_per_account
+		,eqa.EQA_triggers
+
+		--engage metrics from Jo's model
+		,eng.support_segment
+		,eng.engage_activity_segment
+		,eng.marketing_department_sending_outbound_boolean
+		,eng.products
+		,eng.paying_for_engage_boolean
+		,eng.engage_arr
+		,eng.teammates_to_target_count
+		,eng.marketing_tm_names
+		,eng.marketing_tm_emails
+		,eng.days_logging_in_count
+
+		
+		,row_number() Over ( Partition by cb.app_id) as dupe
+
+
+	From (
+	Select max(date) as date From dw.finance_analysis_apps_comprehensive_build) cbm
+	  LEFT JOIN dw.finance_analysis_apps_comprehensive_build cb on cb.date = cbm.date 
+	  LEFT JOIN base.salesforce_account bsa on cb.account_id = bsa.account_id 
+	  LEFT JOIN base.salesforce_user bsu on bsa.account_owner_id = bsu.user_id 
+	  LEFT JOIN (Select app_id,account_id,customer_health_score,customer_health_points From reports.customer_health) hs on cb.app_id = hs.app_id
+	  LEFT JOIN (Select DISTINCT app_id,support_segment From reports.support_success_monthly WHERE support_segment = 'High Volume') hvs on hvs.app_id = cb.app_id
+	  LEFT JOIN (Select industry_primary,product_grouping,listagg(account_name_and_spend,',   ')  as industry_pro_to_premium_look_alike_set From look_alike_final Where industry_rank <= 5 Group by 1,2) laindi on cb.industry_primary = laindi.industry_primary and laindi.product_grouping = 'Inbox'
+   	  LEFT JOIN (Select industry_primary,product_grouping,listagg(account_name_and_spend,',   ')  as industry_pro_to_premium_look_alike_set From look_alike_final Where industry_rank <= 5 Group by 1,2) laindm on cb.industry_primary = laindm.industry_primary and laindm.product_grouping = 'Messages'
+	  LEFT JOIN (Select company_reporting_segment,product_grouping,listagg(account_name_and_spend,',   ')  as crs_pro_to_premium_look_alike_set From look_alike_final Where crs_rank <= 5 Group by 1,2) lacrsi on cb.company_reporting_segment = lacrsi.company_reporting_segment and lacrsi.product_grouping = 'Inbox'
+	  LEFT JOIN (Select company_reporting_segment,product_grouping,listagg(account_name_and_spend,',   ')  as crs_pro_to_premium_look_alike_set From look_alike_final Where crs_rank <= 5 Group by 1,2) lacrsm on cb.company_reporting_segment = lacrsm.company_reporting_segment and lacrsm.product_grouping = 'Messages'
+	  LEFT JOIN tmp.lk_eqa_definitions eqa on cb.app_id = eqa.app_id 
+
+	  --********Left Join for engage analytics sql********
+	  LEFT JOIN (
+	  				
+                        WITH cte_all_customers AS (SELECT finance_analysis_apps_comprehensive_build.app_id
+                                                        , finance_analysis_apps_comprehensive_build.app_name
+                                                        , apps.sf_account_id
+                                                        , apps.sf_account_name
+                                                        , apps.sf_account_owner_name
+                                                        , apps.sf_account_csm_name
+                                                        , finance_analysis_apps_comprehensive_build.company_reporting_segment
+                                                        , finance_dim_apps_pricing_plans_group.price_plan_version_major            AS pricing_model
+                                                        , DATE_TRUNC('month',
+                                                                     finance_analysis_apps_comprehensive_build.first_invoice_date) AS starting_cohort
+                                                        , support_success_monthly.support_segment
+                                                        , engage_success_fy23.engage_activity_segment
+                                                        , finance_analysis_apps_comprehensive_build.eop_arr
+                                                   FROM dw.finance_analysis_apps_comprehensive_build
+                                                            LEFT JOIN dw.apps ON finance_analysis_apps_comprehensive_build.app_id = apps.id
+                                                            LEFT JOIN dw.finance_dim_apps_pricing_plans_group
+                                                                      ON finance_analysis_apps_comprehensive_build.price_plan =
+                                                                         finance_dim_apps_pricing_plans_group.price_plan
+                                                            LEFT JOIN reports.engage_success_fy23
+                                                                      ON finance_analysis_apps_comprehensive_build.app_id =
+                                                                         engage_success_fy23.app_id AND
+                                                                         finance_analysis_apps_comprehensive_build.month =
+                                                                         engage_success_fy23.month
+                                                            LEFT JOIN reports.support_success_monthly
+                                                                      ON finance_analysis_apps_comprehensive_build.app_id =
+                                                                         support_success_monthly.app_id AND
+                                                                         finance_analysis_apps_comprehensive_build.month =
+                                                                         support_success_monthly.month
+                                                   WHERE finance_analysis_apps_comprehensive_build.month_ending IS TRUE
+                                                     AND finance_analysis_apps_comprehensive_build.month =
+                                                         DATE_TRUNC('month', getdate()) - INTERVAL '1 month')
+
+                           , cte_products AS (SELECT app_id
+                                                   , LISTAGG(product_rate_plan_desc, ', ') AS products
+                                              FROM dw.finance_analysis_product_arr
+                                              WHERE month_ending IS TRUE
+                                                AND month = DATE_TRUNC('month', getdate()) - INTERVAL '1 month'
+                                              GROUP BY 1)
+
+                           , cte_engage_revenue AS (SELECT app_id
+                        -- ppp (Messages Essential, Pro, Premium)
+                                                         , SUM(CASE
+                                                                   WHEN product_grouping = 'Messages'
+                                                                       THEN product_eop_arr END) AS ppp_engage_arr
+                        -- vbp 1 advanced engage add on
+                                                         , SUM(CASE
+                                                                   WHEN product_grouping = 'Advanced Engage'
+                                                                       THEN product_eop_arr END) AS vbp1_engage_arr
+                        -- vbp 2 engage pro/premium, 3 tiers for people reached bands
+                                                         , SUM(CASE
+                                                                   WHEN product_grouping = 'VBP 2.0' AND
+                                                                        product_rate_plan_desc IN
+                                                                        ('Engage Premium', 'Engage Pro', 'Engage Pro\\n',
+                                                                         'People Reached Tier 1',
+                                                                         'People Reached Tier 2',
+                                                                         'People Reached Tier 3')
+                                                                       THEN product_eop_arr
+                                                                   ELSE NULL END)                AS vbp2_engage_arr
+                                                    FROM dw.finance_analysis_product_arr
+                                                    WHERE month_ending IS TRUE
+                                                      AND month = DATE_TRUNC('month', getdate()) - INTERVAL '1 month'
+                                                    GROUP BY 1)
+
+                        --    customers and their teammates sending outbound (any type) ever
+                           , cte_teammates_sending_ob AS (SELECT outbound.app_id
+                                                               , outbound.sender_id AS admin_id
+                                                          FROM dw.outbound
+                                                          WHERE went_live_at IS NOT NULL
+                                                          GROUP BY 1, 2)
+
+                        --    customers with marketing departments sending outbound to logged-in users in 2022
+                           , cte_marketing_sending_ob AS (SELECT app_id
+                                                               , 1 AS marketing_department_sending_outbound_boolean
+                                                          FROM reports.engage_success_fy23
+                                                          WHERE month >= '2022-01-01'
+                                                            AND marketing_department_sending_teammates > 0
+                                                          GROUP BY 1)
+
+                        -- customers with marketing department teammates visiting the Outbound section in the last 90 days
+                           , cte_marketing_in_product AS (SELECT eventstream.app_id
+                                                               , eventstream.admin_id
+                                                               , admins_cleanse.name
+                                                               , admins_cleanse.email
+                                                               , COUNT(DISTINCT DATE_TRUNC('day', eventstream.created_at)) AS days_logging_in_count
+                                                          FROM rd.eventstream
+                                                                   INNER JOIN dw.admins_cleanse ON eventstream.admin_id = admins_cleanse.id AND
+                                                                                                   eventstream.app_id =
+                                                                                                   admins_cleanse.default_app_id
+                                                          WHERE DATE_TRUNC('month', eventstream.created_at) >=
+                                                                DATE_TRUNC('day', getdate()) - INTERVAL '90 days'
+                                                            AND eventstream.action = 'navigated'
+                                                            AND eventstream.object LIKE 'apps.app.outbound%'
+                                                            AND admins_cleanse.department = 'marketing'
+                                                          GROUP BY 1, 2, 3, 4)
+
+                        -- marketing teammates that has never sent any outbound - count
+                           , cte_teammates_to_target_count AS (SELECT cte_marketing_in_product.app_id
+                                                                    , COUNT(cte_marketing_in_product.admin_id) AS marketing_tm_logging_in_not_sending_ob_count
+                                                               FROM cte_marketing_in_product
+                                                                        LEFT JOIN cte_teammates_sending_ob
+                                                                                  ON cte_marketing_in_product.admin_id =
+                                                                                     cte_teammates_sending_ob.admin_id AND
+                                                                                     cte_marketing_in_product.app_id =
+                                                                                     cte_teammates_sending_ob.app_id
+                                                               WHERE cte_teammates_sending_ob.admin_id IS NULL
+                                                               GROUP BY 1)
+
+                           -- marketing teammates that has never sent any outbound - names/emails/number days logged in
+                           , cte_teammates_to_target_names AS (SELECT cte_marketing_in_product.app_id
+                                                                    , LISTAGG(cte_marketing_in_product.name, ', ')  AS marketing_tm_names
+                                                                    , LISTAGG(cte_marketing_in_product.email, ', ') AS marketing_tm_emails
+                                                                    , LISTAGG(days_logging_in_count, ',')           AS days_logging_in_count
+                                                               FROM cte_marketing_in_product
+                                                                        LEFT JOIN cte_teammates_sending_ob
+                                                                                  ON cte_marketing_in_product.admin_id =
+                                                                                     cte_teammates_sending_ob.admin_id AND
+                                                                                     cte_marketing_in_product.app_id =
+                                                                                     cte_teammates_sending_ob.app_id
+                                                               WHERE cte_teammates_sending_ob.admin_id IS NULL
+                                                               GROUP BY 1)
+
+
+                        SELECT cte_all_customers.*
+                             , COALESCE(cte_marketing_sending_ob.marketing_department_sending_outbound_boolean,
+                                        0)                                  AS marketing_department_sending_outbound_boolean -- outbound to logged in users by mktng tm since Jan 2022
+                             , cte_products.products
+                             , CASE
+                                   WHEN cte_engage_revenue.ppp_engage_arr > 0 OR
+                                        cte_engage_revenue.vbp1_engage_arr > 0 OR cte_engage_revenue.vbp2_engage_arr > 0
+                                       THEN TRUE
+                                   ELSE FALSE END                           AS paying_for_engage_boolean
+                             , COALESCE(cte_engage_revenue.ppp_engage_arr, cte_engage_revenue.vbp1_engage_arr,
+                                        cte_engage_revenue.vbp2_engage_arr) AS engage_arr
+                             , COALESCE(cte_teammates_to_target_count.marketing_tm_logging_in_not_sending_ob_count,
+                                        0)                                  AS teammates_to_target_count
+                             , cte_teammates_to_target_names.marketing_tm_names
+                             , cte_teammates_to_target_names.marketing_tm_emails
+                             , cte_teammates_to_target_names.days_logging_in_count
+                        FROM cte_all_customers
+                                 LEFT JOIN cte_marketing_sending_ob ON cte_all_customers.app_id = cte_marketing_sending_ob.app_id
+                                 LEFT JOIN cte_products ON cte_all_customers.app_id = cte_products.app_id
+                                 LEFT JOIN cte_engage_revenue ON cte_all_customers.app_id = cte_engage_revenue.app_id
+                                 LEFT JOIN cte_teammates_to_target_count ON cte_all_customers.app_id = cte_teammates_to_target_count.app_id
+                                 LEFT JOIN cte_teammates_to_target_names ON cte_all_customers.app_id = cte_teammates_to_target_names.app_id
+                                 LEFT JOIN dw.sales_accounts ON cte_all_customers.app_id = sales_accounts.app_id
+                        WHERE 1=1
+                          --AND cte_all_customers.app_Id = '12979'
+                          --AND teammates_to_target_count > 0
+                          --AND marketing_department_sending_outbound_boolean IS NULL -- sending engage outbound i.e. logged-in users
+                          --AND sales_accounts.is_rm_named_account IS TRUE
+                          --AND paying_for_engage_boolean IS TRUE
+                          --AND sf_account_owner_name <> 'Global Sales'
+                        ORDER BY sf_account_owner_name	  
+	  	) eng on cb.app_id = eng.app_id 
+	  	
+
+
+	  --********Left Join for usage limits********
+	  Left Join (
+			  Select cb.app_id,ula.*
+				From (Select max(date) as date From dw.finance_analysis_apps_comprehensive_build) a
+					Left Join dw.finance_analysis_apps_comprehensive_build cb on a.date = cb.date
+					Left Join ( 
+						Select
+							subscription_id	
+							,support_seats+engage_seats+marketing_seats+proactive_support_seats as vbp2_seats_limit		
+							,minimum_agent_count
+							,minimum_active_people_count
+							,thirty_day_messaged_contacts
+							,thirty_day_messaged_contacts_product_tours
+							,row_number() over(partition by subscription_id order by assigned_at desc) as assign_recency
+							,row_number() over(partition by subscription_id order by assigned_at) as assign_recency_desc
+						From rd.usage_limit_agreements
+					) ula on cb.subscription_id = ula.subscription_id and ula.assign_recency = 1 -- take the most recent contracted amount for a subscription
+					Where 1=1 
+						and cb.subscription_type = 'annual_primary'	
+				) ula on cb.app_id = ula.app_id 
+	  Left Join (
+				Select  
+						date
+						--,app_id
+						,normalized_paying_app_id
+						
+						,SUM(current_seats_usage)		 		as current_seats_usage
+						,SUM(seats_usage_90_lead) 				as seats_usage_90_lead
+						
+						,SUM(current_people_usage) 				as current_people_usage
+						,SUM(people_usage_90_lead) 				as people_usage_90_lead
+						
+						--,SUM(current_people_reached) 		as current_people_reached
+						--,SUM(current_people_reached) 		as current_people_reached
+						
+				FROM (
+				SELECT  a.date
+					   ,a.app_id
+					   ,a.subscription_type
+					   ,b.normalized_paying_app_id
+					   					   
+				   	   ,CASE WHEN a.price_plan_group = 'ppp' THEN a.seats_ppp 						
+	 				   	   	 WHEN (a.price_plan='core_with_add_ons_feb2021' or a.price_plan='core_with_add_ons') THEN a.seats_vbp
+	 				   	   	 WHEN (a.price_plan='value_based_pricing_feb2022' or a.price_plan='value_based_pricing_mar2021' or a.price_plan='value_based_pricing_mar2021_early_stage') THEN  (a.engage_seats_vbp + a.support_seats_vbp + marketing_seats_vbp + proactive_support_seats_vbp)
+	   	   					END as current_seats_usage
+	   	   					
+					   ,CASE WHEN a.price_plan_group = 'ppp' THEN a.quarterly_active_people_ppp 						
+	 				   	   	 WHEN (a.price_plan='core_with_add_ons_feb2021' or a.price_plan='core_with_add_ons') THEN a.people_reached_vbp
+ 	 				   	   	 WHEN (a.price_plan='value_based_pricing_feb2022' or a.price_plan='value_based_pricing_mar2021' or a.price_plan='value_based_pricing_mar2021_early_stage') THEN a.people_reached_vbp
+	   	   					END as current_people_usage
+					   
+					   ,NULLIF(lead(current_seats_usage,90) 
+				   				Over (Partition by a.app_id Order by date DESC),0) 				   as seats_usage_90_lead
+					   ,NULLIF(lead(current_people_usage,90) 
+				   				Over (Partition by a.app_id Order by date DESC),0) 				   as people_usage_90_lead
+					   					   
+				FROM dw.finance_analysis_apps_comprehensive_build a
+    			Left Join (
+					Select  
+						a.app_id
+					   ,a.annual_contract_salesforce_opportunity_id
+					   ,subscription_type
+					   ,CASE WHEN d.subscription_type = 'monthly' and c.app_id iS NULL THEN a.app_id
+					   		 WHEN d.subscription_type = 'annual_primary' and c.app_id iS NOT NULL THEN c.app_id
+				 	   		 WHEN d.subscription_type = 'annual_secondary' and c.app_id iS NOT NULL THEN c.app_id
+					   		 ELSE NULL END as normalized_paying_app_id
+					   ,row_number() Over (Partition by a.app_id) as dupe
+					From dw.subscriptions a
+					Left Join dw.apps b on a.app_id = b.id
+					Left Join (Select app_id,annual_contract_salesforce_opportunity_id From dw.subscriptions Where annual_contract_primary_subscription = TRUE) c on 
+					a.annual_contract_salesforce_opportunity_id = c.annual_contract_salesforce_opportunity_id
+					Left Join (Select account_id,app_id, subscription_type From ((Select max(date) as date From dw.finance_analysis_apps_comprehensive_build) cbm Left Join dw.finance_analysis_apps_comprehensive_build cb on cb.date = cbm.date)) d on a.app_id = d.app_id
+					Where 1=1
+						and (a.cancelled_at >= current_date or a.cancelled_at is NULL)
+						--and account_id = '001o000000YXLvVAAX'
+						--and a.app_id = '941379'
+	  			) b on a.app_id = b.app_id and b.dupe = 1 
+				Where 1=1
+					and date >= '2021-02-1'
+					--and date = '2022-05-25'
+					--and b.normalized_paying_app_id = '937251'
+					--and account_id = '001o000000YXLvVAAX'
+					Order by date DESC		
+			) Group by 1,2
+			) ug on cb.app_id = ug.normalized_paying_app_id and cb.date = ug.date
+
+
+	  --********Left Join for product subscripton information, ie do they have the product or not********
+		Left Join (
+			Select 
+					app_id
+					
+					--products & tiers					
+							--PPP
+							,listagg(inbox)				as Inbox
+							,listagg(Messages)			as Messages
+							,listagg(Articles)			as Articles
+							
+							--VBP 1x
+							,listagg(vbp_1x_core_tier)  as vbp_1x_core_tier
+							
+							--VBP 2x
+							,listagg(vbp2_engage_tier)  as vbp2_engage_tier
+					
+					--add-ons
+							--PPP
+							,listagg(Custom_Bots)		as Custom_Bots
+							,listagg(Resolution_Bot)	as Resolution_Bot
+							
+							--VBP
+							,listagg(advanced_engage)   as advanced_engage
+							,listagg(advanced_lead_gen) as advanced_lead_gen
+							,listagg(advanced_support)	as advanced_support
+	
+							--Both 
+							,listagg(Product_Tours)		as Product_Tours
+							,listagg(Whatsapp)			as Whatsapp
+							,listagg(Surveys)			as Surveys
+							,listagg(Switch)			as Switch
+							,listagg(SMS)				as SMS
+						
+					--products eop_arr
+							--PPP
+							,SUM(inbox_arr) 			as inbox_arr
+							,SUM(messages_arr) 			as messages_arr
+							,SUM(articles_arr) 			as articles_arr
+							
+							--VBP 1x
+							,SUM(vbp_1x_core_tier_arr) 	as vbp_1x_core_tier_arr
+							
+						
+					--add-ons eop_arr
+							--PPP
+							,SUM(custom_bots_arr) 		as custom_bots_arr
+							,SUM(resolution_bot_arr) 	as resolution_bot_arr
+							
+							--VBP
+							,SUM(advanced_engage_arr) 	as advanced_engage_arr
+							,SUM(advanced_lead_gen_arr) as advanced_lead_gen_arr
+							,SUM(advanced_support_arr)  as advanced_support_arr
+	
+							--Both
+							,SUM(product_tours_arr) 		as product_tours_arr
+							,SUM(whatsapp_arr) 					as whatsapp_arr
+							,SUM(surveys_arr) 					as surveys_arr
+							,SUM(switch_arr) 						as switch_arr
+							,SUM(sms_arr) 							as sms_arr
+				 	   
+			From(
+				Select 
+				
+					--pulls all dw.finance_analysis_product_arr data
+					fapa.*
+					--PPP Product Table 
+					
+							--Products and Tiers 
+									--PPP
+									,CASE WHEN product_grouping = 'Inbox' THEN product_tier ELSE '' END as Inbox
+									,CASE WHEN product_grouping = 'Messages' THEN product_tier ELSE '' END as Messages
+									,CASE WHEN product_grouping = 'Articles' THEN product_tier ELSE '' END as Articles
+									
+									--VBP 1.0
+									,CASE WHEN product_grouping = 'VBP Core' THEN product_tier ELSE '' END as vbp_1x_core_tier
+									
+									--VBP 1.0
+									,CASE WHEN product_rate_plan_desc ILIKE 'Engage%' THEN product_tier ELSE '' END as vbp2_engage_tier								
+							
+							
+							--Add-Ons
+									--PPP
+									,CASE WHEN product_grouping = 'Custom Bots' THEN product_tier ELSE '' END as Custom_Bots
+									,CASE WHEN product_grouping = 'Resolution Bot' THEN product_tier ELSE '' END as Resolution_Bot
+	
+									--VBP 1.0
+									,CASE WHEN product_grouping = 'Advanced Engage' THEN product_rate_plan_desc ELSE '' END as advanced_engage
+									,CASE WHEN product_grouping = 'Advanced Lead Gen' THEN product_rate_plan_desc ELSE '' END as advanced_lead_gen
+									,CASE WHEN product_grouping = 'Advanced Support' THEN product_rate_plan_desc ELSE '' END as advanced_support
+
+	
+									--Both
+									,CASE WHEN product_grouping = 'Product Tours' THEN product_tier ELSE '' END as Product_Tours
+									,CASE WHEN product_grouping = 'Whatsapp' THEN product_tier ELSE '' END as Whatsapp
+									,CASE WHEN product_grouping = 'Surveys' THEN product_tier ELSE '' END as Surveys
+									,CASE WHEN product_grouping = 'Switch' THEN product_tier ELSE '' END as Switch		
+									,CASE WHEN product_rate_plan_desc = 'SMS' THEN product_rate_plan_desc ELSE '' END as SMS		
+							
+							--Products and Tiers ARR
+									--PPP
+									,CASE WHEN product_grouping = 'Inbox' THEN product_eop_arr ELSE 0 END as inbox_arr
+									,CASE WHEN product_grouping = 'Messages' THEN product_eop_arr ELSE 0 END as messages_arr
+									,CASE WHEN product_grouping = 'Articles' THEN product_eop_arr ELSE 0 END as articles_arr
+									
+									--VBP 1.0
+									,CASE WHEN product_grouping = 'VBP Core' THEN product_eop_arr ELSE 0 END as vbp_1x_core_tier_arr
+									
+									--Both 
+						
+							--Add-Ons ARR
+									--PPP Only
+									,CASE WHEN product_grouping = 'Custom Bots' THEN product_eop_arr ELSE 0 END as custom_bots_arr
+									,CASE WHEN product_grouping = 'Resolution Bot' THEN product_eop_arr ELSE 0 END as resolution_bot_arr
+	
+									--VBP 1.0
+									,CASE WHEN product_grouping = 'Advanced Engage' THEN product_eop_arr ELSE 0 END as advanced_engage_arr
+									,CASE WHEN product_grouping = 'Advanced Lead Gen' THEN product_eop_arr ELSE 0 END as advanced_lead_gen_arr
+									,CASE WHEN product_grouping = 'Advanced Support' THEN product_eop_arr ELSE 0 END as advanced_support_arr
+	
+									--Both
+									,CASE WHEN product_grouping = 'Product Tours' THEN product_eop_arr ELSE 0 END as product_tours_arr
+									,CASE WHEN product_grouping = 'Whatsapp' THEN product_eop_arr ELSE 0 END as whatsapp_arr
+									,CASE WHEN product_grouping = 'Surveys' THEN product_eop_arr ELSE 0 END as surveys_arr
+									,CASE WHEN product_grouping = 'Switch' THEN product_eop_arr ELSE 0 END as switch_arr
+									,CASE WHEN product_rate_plan_desc = 'SMS' THEN product_eop_arr ELSE 0 END as sms_arr
+									
+									
+					
+						
+			
+					From (Select max(date) as date From dw.finance_analysis_apps_comprehensive_build) cbm
+						Left Join dw.finance_analysis_product_arr fapa on cbm.date = fapa.date
+					Where 1=1
+					Order by date DESC 
+						)		
+						Group by 1
+				) ptaa on ptaa.app_id = cb.app_id
+				
+		LEFT JOIN (SELECT * FROM coda.current_messages_pricing) pppp on (GREATEST(ug.current_people_usage :: INT,ula.minimum_active_people_count) BETWEEN pppp.active_people_lower_range and pppp.active_people_upper_range) and cb.price_plan_group = 'ppp'
+		LEFT JOIN (SELECT * FROM coda.intercom_vbp1x_pr_pricing) vbpp on (GREATEST(ug.current_people_usage :: INT,ula.thirty_day_messaged_contacts) BETWEEN vbpp.people_reached_lower_range and vbpp.people_reached_upper_range) and (cb.price_plan='core_with_add_ons_feb2021' or cb.price_plan='core_with_add_ons') 
+		LEFT JOIN (
+					with add_on_eligability_table as (
+					
+						Select DISTINCT 
+									  	a.app_id
+ 									  , a.app_package_id
+						              , a.app_package_name
+
+						              , CASE
+						                    WHEN a.app_package_id = '32204' 									THEN 'sms'
+											WHEN a.app_package_id = '28' 										THEN 'sms'
+											WHEN a.app_package_id = '145' 										THEN 'sms'
+											WHEN a.app_package_id = '291' 										THEN 'sms'
+											WHEN a.app_package_id = '35274' 									THEN 'sms'
+											WHEN a.app_package_id = '333' 										THEN 'sms'
+
+											--false flags
+											WHEN a.app_package_id = '654'										THEN NULL
+									  		WHEN a.app_package_id = '650'										THEN NULL
+											
+						                    WHEN a.app_package_description ILIKE '% sms%'    					THEN 'sms'
+						                    WHEN a.app_package_description ILIKE '% twilio%' 					THEN 'sms'
+						                    WHEN (a.app_package_description ILIKE '% text%' 						
+						                    	and a.app_package_description NOT ILIKE '%rich text%'  
+ 						                    	and a.app_package_description NOT ILIKE '%add text%') 			THEN 'sms' 
+						                    
+						                    WHEN app_store_listings.long_description ILIKE '% sms%' 			THEN 'sms'
+						                    WHEN app_store_listings.long_description ILIKE '% twilio%' 			THEN 'sms'
+						                    WHEN (app_store_listings.long_description ILIKE '% text%' 		
+						                    	and app_store_listings.long_description NOT ILIKE '%rich text%'   
+						                    	and app_store_listings.long_description NOT ILIKE '%add text%') THEN 'sms'      
+						                END as sms_eligibility
+						
+						              , CASE 
+											WHEN a.app_package_id = '32204' 									THEN 'whatsapp'
+											WHEN a.app_package_id = '68817' 									THEN 'whatsapp'
+											WHEN a.app_package_id = '69542' 									THEN 'whatsapp'              		
+											
+						              		WHEN a.app_package_description ILIKE '% whatsapp%' 					THEN 'whatsapp' 
+						              		
+						              		WHEN app_store_listings.long_description ILIKE '%whatsapp%' 		THEN 'whatsapp' 
+						      			END as whatsapp_eligibility
+						/*
+						              , CASE
+						                    WHEN a.app_package_id = '28' 										THEN 'switch'
+											WHEN a.app_package_id = '724' 										THEN 'switch'
+											WHEN a.app_package_id = '291' 										THEN 'switch'
+											WHEN a.app_package_id = '790' 										THEN 'switch'
+											WHEN a.app_package_id = '36975' 									THEN 'switch'
+											WHEN a.app_package_id = '912' 										THEN 'switch'
+											WHEN a.app_package_id = '82128' 									THEN 'switch'
+											WHEN a.app_package_id = '26690' 									THEN 'switch'
+											WHEN a.app_package_id = '67024' 									THEN 'switch'
+											WHEN a.app_package_id = '755' 										THEN 'switch'
+											WHEN a.app_package_id = '333' 										THEN 'switch'
+											WHEN a.app_package_id = '32691' 									THEN 'switch'
+											WHEN a.app_package_id = '73508' 									THEN 'switch'
+											WHEN a.app_package_id = '959' 										THEN 'switch'
+											
+											--False flag switch
+											WHEN a.app_package_id = '646' 										THEN NULL
+						                    WHEN a.app_package_id = '47' 										THEN NULL
+						                    
+						                    WHEN a.app_package_description ILIKE ' %dial%' 						THEN 'switch'
+						                    WHEN (a.app_package_description ILIKE '% phone%' 				
+						                		and a.app_package_description not ILIKE '% phone number%') 	
+						                    		THEN 'switch'
+						                    		
+						                    WHEN (a.app_package_description ILIKE '% call' 
+						                		and a.app_package_description NOT ILIKE '% video%'
+						                		and a.app_package_description NOT ILIKE '%schedule%'
+						                		and a.app_package_description NOT ILIKE '% call recordings%'						                		
+						                		and a.app_package_description NOT ILIKE '% call-backs'
+						                		) THEN 'switch'
+						
+						                    WHEN app_store_listings.long_description ILIKE '% dial%'		THEN 'switch'
+						                    
+						                    WHEN (a.app_package_description ILIKE '% phone%' 				
+						                		and a.app_package_description not ILIKE '% phone number%') 	THEN 'switch'
+						                		
+						                    WHEN (app_store_listings.long_description ILIKE '% call%' 
+						                		and app_store_listings.long_description not ILIKE '% video%'
+						                		and app_store_listings.long_description not ILIKE '%schedule%'
+						                		and app_store_listings.long_description not ILIKE '% call recordings%'
+						                		and app_store_listings.long_description not ILIKE '% call-backs'
+						                		) THEN 'switch'
+								
+						                    		
+						    			END as switch_eligibility
+						*/
+						              , CASE
+						                    WHEN a.app_package_id = '823' 									THEN 'surveys'
+											WHEN a.app_package_id = '120' 									THEN 'surveys'
+											WHEN a.app_package_id = '47' 									THEN 'surveys'
+											WHEN a.app_package_id = '42758' 								THEN 'surveys'
+											WHEN a.app_package_id = '162' 									THEN 'surveys'
+											WHEN a.app_package_id = '49955' 								THEN 'surveys'
+											WHEN a.app_package_id = '40' 									THEN 'surveys'
+											WHEN a.app_package_id = '45996' 								THEN 'surveys'
+											WHEN a.app_package_id = '24123' 								THEN 'surveys'
+											WHEN a.app_package_id = '32495' 								THEN 'surveys'
+											WHEN a.app_package_id = '38372' 								THEN 'surveys'
+											WHEN a.app_package_id = '32' 									THEN 'surveys'
+											WHEN a.app_package_id = '38778' 								THEN 'surveys'
+											WHEN a.app_package_id = '28248' 								THEN 'surveys'
+											WHEN a.app_package_id = '910' 									THEN 'surveys'
+											WHEN a.app_package_id = '52473' 								THEN 'surveys'
+											WHEN a.app_package_id = '80' 									THEN 'surveys'
+											WHEN a.app_package_id = '728' 									THEN 'surveys'
+											WHEN a.app_package_id = '41478' 								THEN 'surveys'
+											
+											WHEN a.app_package_id = '29862' 								THEN NULL
+											WHEN a.app_package_id = '480' 									THEN NULL
+						                    
+						                    WHEN a.app_package_description ILIKE '%survey%' 				THEN 'surveys'
+						                    WHEN a.app_package_description ILIKE '%poll%' 					THEN 'surveys' 
+						                    
+						                    WHEN app_store_listings.long_description ILIKE '%survey%' 		THEN 'surveys'
+						                    WHEN app_store_listings.long_description ILIKE '%poll%' 		THEN 'surveys' 
+						
+						                END as surveys_eligibility
+						
+									,CASE 
+										WHEN a.app_package_id = '960' 										THEN 'product_tours'
+										WHEN a.app_package_id = '63367' 									THEN 'product_tours'
+										WHEN a.app_package_id = '951' 										THEN 'product_tours'
+										WHEN a.app_package_id = '728' 										THEN 'product_tours'
+										WHEN a.app_package_id = '51853' 									THEN 'product_tours'
+										--WHEN a.app_package_id = '654' 									THEN 'product_tours'
+										
+										WHEN a.app_package_id = '28773'										THEN NULL
+
+										
+					                    --WHEN a.app_package_description ILIKE '% guide %' 					THEN 'product_tours'
+					                    --WHEN a.app_package_description ILIKE '% demo %' 					THEN 'product_tours'
+					                    WHEN a.app_package_description ILIKE '% tour%' 						THEN 'product_tours'				                    
+
+					                    --WHEN app_store_listings.long_description ILIKE '% guide%' 		THEN 'product_tours'
+					                    --WHEN app_store_listings.long_description ILIKE '% demo%' 			THEN 'product_tours'
+					                    WHEN app_store_listings.long_description ILIKE '% tour%' 			THEN 'product_tours'
+					                    
+					                    
+
+										
+									ENd as product_tours_eligibility
+
+								  , CASE 
+								  		WHEN a.app_package_id = '145' 									THEN TRUE
+								  		WHEN a.app_package_id = '35216' 								THEN TRUE
+								  		WHEN a.app_package_id = '36429' 								THEN TRUE
+								  		WHEN a.app_package_id = '339' 									THEN TRUE									  											  		
+								  		WHEN a.app_package_id = '912' 									THEN TRUE
+								  		WHEN a.app_package_id = '163' 									THEN TRUE
+								  		ELSE FALSE									  											  		
+									END as omit_eligibiliy			
+
+						              , c.app_count
+						              , a.app_package_description
+						              , app_store_listings.long_description                              AS app_store_listing_description
+
+									  , CASE WHEN sms_eligibility IS NOT NULL THEN app_package_name + ' (' + sms_eligibility + ') / ' ELSE NULL END sms_eligibility_app
+									  , CASE WHEN whatsapp_eligibility IS NOT NULL THEN app_package_name + ' (' + whatsapp_eligibility + ') / ' ELSE NULL END whatsapp_eligibility_app
+									  --, CASE WHEN switch_eligibility IS NOT NULL THEN app_package_name +' (' + switch_eligibility  + ') / ' ELSE NULL END switch_eligibility_app
+									  , CASE WHEN surveys_eligibility IS NOT NULL THEN app_package_name +' (' + surveys_eligibility  + ') / ' ELSE NULL END surveys_eligibility_app
+									  , CASE WHEN product_tours_eligibility IS NOT NULL THEN app_package_name +' (' + product_tours_eligibility + ') / ' ELSE NULL END product_tours_eligibility_app
+										
+									  ,ISNULL(surveys_eligibility,'1') + ISNULL(product_tours_eligibility,'1') /*+ ISNULL(switch_eligibility,'1')*/ + ISNULL(sms_eligibility,'1') + ISNULL(whatsapp_eligibility,'1') as no_flags
+
+							
+							FROM (Select max(date) as date From dw.finance_analysis_apps_comprehensive_build) cbm
+							  	 Left Join dw.finance_analysis_apps_comprehensive_build cb on cb.date = cbm.date
+								 LEFT JOIN dw.integrations_by_app a on cb.app_id = a.app_id
+						         --Left join (Select app_package_id, description FROM rd.app_packages) b on a.app_package_id = b.app_package_id
+						         LEFT join (Select app_package_id, is_installed, count(app_id) as app_count
+						                    From dw.integrations_by_app
+						                    Where is_installed = TRUE
+						                    Group by 1, 2) c on a.app_package_id = c.app_package_id
+						         LEFT JOIN rd.app_store_listings ON a.app_package_id = app_store_listings.app_package_id
+						Where 1 = 1
+						  and ((c.app_count > 25 and app_package_state = 'public') or (c.app_count > 0 and app_package_state = 'private'))
+						  and omit_eligibiliy = FALSE
+						  --and no_flags != '11111'
+						  --and a.app_package_id = '650'
+						Order by c.app_count DESC
+						
+						),
+						distinct_eligability as (
+							Select   app_id
+								   , listagg(DISTINCT sms_eligibility_app) 				as sms_eligibility_app
+								   , listagg(DISTINCT whatsapp_eligibility_app) 		as whatsapp_eligibility_app
+								   --, Listagg(DISTINCT switch_eligibility_app)			as switch_eligibility_app
+								   , listagg(DISTINCT surveys_eligibility_app) 			as surveys_eligibility_app
+								   , listagg(DISTINCT product_tours_eligibility_app)	as product_tours_eligibility_app
+							From add_on_eligability_table
+								Where 1=1
+								Group by 1
+						)
+						
+						Select 
+								  app_id
+						  		, ISNULL(sms_eligibility_app + ' ','') as sms_eligibility_app
+								, ISNULL(whatsapp_eligibility_app + ' ','') as whatsapp_eligibility_app
+								--, ISNULL(switch_eligibility_app + ' ','') as switch_eligibility_app
+								, ISNULL(surveys_eligibility_app + ' ','') as surveys_eligibility_app
+								, ISNULL(product_tours_eligibility_app + ' ','') as product_tours_eligibility_app
+							  	 
+							  	 
+						  From distinct_eligability
+							 Where 1=1
+							 --and add_on_eligibility_apps <> ''
+							 							 
+					) aoe on aoe.app_id = cb.app_id
+		  Where 1=1 
+		   and (cb.is_rm_named_account = TRUE or cb.is_new_rm_named_account or bsu.user_role_name ILIKE '%Growth2%')
+		   and cb.subscription_type != 'annual_secondary'
+		   Order by 1
+	)
+-- Health Score
+    , health_score_data as (
+	    select * from (
+      select *, row_number() over (partition by account_id order by month desc) as rn
+      from analysis.health_score_tableau_insert_v3)aaa
+      where rn = 1)
+      
+    , risk_flag as (
+    select * from (select app_id, opportunity_renewal_risk, opportunity_renewal_risk_type, rank() over (partition by app_id order by close_date desc, proposal_timestamp desc) as rnk
+    from base.salesforce_opportunity
+    )aaa
+    where aaa.rnk = 1
+    )
+    
+-- Final Selection
+    , cte_res as (
+    select a.*, ooo.opportunity_renewal_risk, ooo.opportunity_renewal_risk_type from (
+	    Select apps.*, hs.health_score
+	    From apps
+	    left join health_score_data hs on hs.account_id = apps.account_id)a
+	                           -- case when max(to_char(apps.date, 'YYYY-MM')) = max(split_part(to_char(hs.month, 'YYYY-MM'),'-',1)||'-'|| split_part(to_char(hs.month, 'YYYY-MM'),'-',2)::integer + 1) 
+	                           --           then (to_char(apps.date, 'YYYY-MM')) = (split_part(to_char(hs.month, 'YYYY-MM'),'-',1)||'-'|| split_part(to_char(hs.month, 'YYYY-MM'),'-',2)::integer + 1) and hs.account_id = apps.account_id
+	                           --      when max(to_char(apps.date, 'YYYY-MM')) = max(split_part(to_char(hs.month, 'YYYY-MM'),'-',1)||'-'|| split_part(to_char(hs.month, 'YYYY-MM'),'-',2)::integer + 2)
+	                           --           then (to_char(apps.date, 'YYYY-MM')) = (split_part(to_char(hs.month, 'YYYY-MM'),'-',1)||'-'|| split_part(to_char(hs.month, 'YYYY-MM'),'-',2)::integer + 2) and hs.account_id = apps.account_id
+                            --   end
+      left join risk_flag ooo on a.app_id = ooo.app_id
+		  Where 1=1 
+		  and dupe <= 1)
+		  
+    SELECT distinct * FROM cte_res 
