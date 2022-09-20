@@ -1,0 +1,768 @@
+with all_sales_managed_accounts as (
+  select
+    account_id
+    ,account_name
+    
+  from base.salesforce_account
+
+  where 1=1
+    and is_rm_named_account
+    or is_new_rm_named_account
+
+  group by 1,2
+)
+
+,forecast_date as ( 
+	Select 
+--		   CAST('2022-08-01' AS DATE) as created_at 
+		  CAST('2022-08-01' AS DATE) 	as close_date
+		 , 0 							as opportunity_id
+		 , 'tmp' 						as company_reporting_segment
+		 , 'tmp' 						as opportunity_assigned_owner_role
+		 , 'tmp' 						as opportunity_assigned_owner_sales_region
+		 , 'tmp' 						as rev_classifier
+		 , TRUE 						as is_an_amendment
+		 , 'tmp' 						as stage_name
+		 , 0	 						as quote_line_arr
+		 ,CAST('2022-08-01' AS DATE)	as contracted_renewal_date
+		 , 'tmp' 						as expansion_category_type
+		 , 'tmp'						as opp_record_type_name
+		 , 'tmp' 						as data_type
+
+--Amendment Target SQL
+-- union all select '2022-10-31',1, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',95458.7157482957,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',2, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',479378.746872021,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',3, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',564385.79938677,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',4, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',1385152.62953587,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',5, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',1723741.39765397,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',6, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',783022.82222116,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',7, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',1377290.0262068,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',8, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',3487325.04401838,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',9, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',1409428.48270017,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',10, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',101225.320600501,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',11, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',345503.232445414,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',12, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',529434.093670051,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',13, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',1259880.69525738,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',14, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',1820262.38444328,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',15, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',867870.749157114,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',16, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',1131344.36272862,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',17, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',3678069.77006755,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',18, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',1491269.59131392,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',19, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',21858.2963486123,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',20, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',84247.4492924768,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',21, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',200829.806869553,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',22, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',311357.416927419,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',23, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',983381.531652234,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',24, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',190864.907118233,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',25, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',253603.42530447,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',26, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1973383.65106854,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',27, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',682145.783890435,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',28, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',27491.7761229641,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',29, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',72018.3248151184,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',30, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',223448.226948871,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',31, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',335895.295722317,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',32, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',1231677.04007213,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',33, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',250910.959572154,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',34, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',247079.915994165,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',35, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',2468607.1110045,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',36, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',856058.084276827,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',37, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',17124.2552789599,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',38, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',65528.3967489406,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',39, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',84689.3856823229,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',40, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',287011.289560685,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',41, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',456430.584422048,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',42, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',274418.094549079,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',43, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',233773.284901738,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',44, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1420745.5047752,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',45, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',1597530.07158877,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',46, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',25656.39269318,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',47, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',66728.7836755939,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',48, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',112247.101894062,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',49, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',368842.619562069,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',50, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',680999.742482001,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',51, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',429737.944649329,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',52, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',271315.509973094,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',53, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',2117162.30163122,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2023-01-31',54, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',2388209.86276145,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 
+-- union all select '2022-10-31',1, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',76015.9756737658,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',2, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',410666.003049591,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',3, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',323522.45918824,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',4, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',535859.738334799,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',5, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',1079106.2365057,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',6, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',469638.624502837,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',7, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',436462.591659222,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',8, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',1753802.84214651,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',9, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',918786.744005466,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',10, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',80608.0560378186,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',11, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',295979.812277642,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',12, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',303487.118471689,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',13, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',487397.074732403,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',14, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',1139530.84482559,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',15, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',520528.410301269,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',16, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',358522.521197319,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',17, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',1849729.8459236,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',18, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',972137.819730124,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',19, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',14207.892626598,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',20, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',76756.2137433223,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',21, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',60468.5044386766,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',22, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',100155.75749303,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',23, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',201692.149644492,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',24, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',87778.5898437435,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',25, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',81577.7681317196,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',26, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',327797.443216131,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',27, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',171727.367699582,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',28, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',17869.6544799267,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',29, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',65614.4960989208,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',30, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',67278.7586349097,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',31, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',108048.968652821,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',32, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',252617.709285764,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',33, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',115393.712443644,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',34, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',79479.3211991428,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',35, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',410058.682129178,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',36, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',215509.06695103,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',37, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',11130.765931324,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',38, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',60132.4539398748,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',39, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',47372.3152907366,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',40, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',78464.1552852369,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',41, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',158009.929190741,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',42, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',68767.6183238687,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',43, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',63909.7624213543,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',44, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',256803.50416604,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2022-10-31',45, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',134534.88030224,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',46, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',16676.655250567,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',47, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',61233.9948772117,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',48, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',62787.1492815287,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',49, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',100835.491946781,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',50, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',235752.652782345,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',51, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',107689.891971185,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',52, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',74173.1878854225,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',53, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',382682.680409509,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+-- union all select '2023-01-31',54, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',201121.427219024,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 
+union all select '2022-08-31',1, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',31819.5719160986,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',2, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',159792.915624007,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',3, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',188128.59979559,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',4, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',461717.543178625,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',5, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',574580.465884658,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',6, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',261007.607407053,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',7, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',459096.675402265,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',8, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1162441.68133946,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',9, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',469809.49423339,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',10, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',33741.7735335002,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',11, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',115167.744148471,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',12, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',176478.03122335,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',13, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',419960.231752458,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',14, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',606754.128147759,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',15, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',289290.249719038,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',16, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',377114.787576205,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',17, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1226023.25668918,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',18, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',497089.863771308,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',19, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',7286.09878287077,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',20, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',28082.4830974923,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',21, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',66943.2689565177,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',22, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',103785.805642473,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',23, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',327793.843884078,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',24, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',63621.6357060777,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',25, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',84534.4751014899,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',26, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',657794.550356181,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',27, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',227381.927963478,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',28, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',9163.92537432138,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',29, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',24006.1082717061,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',30, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',74482.7423162902,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',31, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',111965.098574106,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',32, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',410559.013357378,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',33, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',83636.9865240515,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',34, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',82359.9719980551,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',35, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',822869.037001499,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',36, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',285352.694758942,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',37, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',5708.08509298664,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',38, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',21842.7989163135,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',39, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',28229.795227441,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',40, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',95670.4298535617,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',41, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',152143.528140683,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',42, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',91472.6981830264,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',43, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',77924.4283005794,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',44, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',473581.834925068,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',45, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',532510.023862922,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',46, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',8552.13089772666,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',47, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',22242.9278918646,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',48, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',37415.7006313541,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',49, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',122947.539854023,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',50, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',226999.914160667,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',51, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',143245.981549776,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',52, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',90438.5033243647,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',53, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',705720.767210406,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-11-30',54, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',796069.954253817,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-08-31',1, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',22804.7927021297,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',2, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',123199.800914877,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',3, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',97056.7377564719,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',4, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',160757.92150044,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',5, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',323731.87095171,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',6, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',140891.587350851,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',7, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',130938.777497766,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',8, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',526140.852643953,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',9, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',275636.02320164,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',10, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',24182.4168113456,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',11, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',88793.9436832927,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',12, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',91046.1355415068,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',13, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',146219.122419721,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',14, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',341859.253447677,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',15, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',156158.523090381,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',16, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',107556.756359196,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',17, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',554918.953777081,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',18, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',291641.345919037,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',19, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',4262.3677879794,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',20, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',23026.8641229967,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',21, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',18140.551331603,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',22, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',30046.7272479089,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',23, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',60507.6448933475,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',24, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',26333.5769531231,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',25, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',24473.3304395159,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',26, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',98339.2329648392,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',27, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',51518.2103098745,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',28, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',5360.89634397801,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',29, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',19684.3488296762,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',30, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',20183.6275904729,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',31, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',32414.6905958462,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',32, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',75785.3127857292,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',33, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',34618.1137330933,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',34, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',23843.7963597428,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',35, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',123017.604638753,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',36, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',64652.7200853089,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',37, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',3339.22977939719,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',38, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',18039.7361819625,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',39, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',14211.694587221,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',40, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',23539.2465855711,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',41, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',47402.9787572223,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',42, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',20630.2854971606,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',43, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',19172.9287264063,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',44, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',77041.051249812,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-08-31',45, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',40360.4640906721,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',46, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',5002.99657517009,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',47, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',18370.1984631635,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',48, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',18836.1447844586,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',49, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',30250.6475840343,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',50, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',70725.7958347036,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',51, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',32306.9675913556,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',52, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',22251.9563656267,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',53, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',114804.804122853,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-11-30',54, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',60336.4281657071,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+ 									
+									
+union all select '2022-09-30',55, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',31819.5719160986,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',56, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',159792.915624007,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',57, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',188128.59979559,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',58, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',461717.543178625,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',59, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',574580.465884658,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',60, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',261007.607407053,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',61, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',459096.675402265,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',62, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1162441.68133946,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',63, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',469809.49423339,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',64, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',33741.7735335002,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',65, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',115167.744148471,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',66, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',176478.03122335,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',67, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',419960.231752458,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',68, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',606754.128147759,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',69, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',289290.249719038,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',70, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',377114.787576205,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',71, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1226023.25668918,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',72, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',497089.863771308,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',73, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',7286.09878287077,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',74, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',28082.4830974923,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',75, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',66943.2689565177,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',76, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',103785.805642473,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',77, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',327793.843884078,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',78, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',63621.6357060777,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',79, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',84534.4751014899,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',80, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',657794.550356181,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',81, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',227381.927963478,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',82, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',9163.92537432138,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',83, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',24006.1082717061,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',84, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',74482.7423162902,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',85, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',111965.098574106,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',86, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',410559.013357378,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',87, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',83636.9865240515,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',88, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',82359.9719980551,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',89, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',822869.037001499,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',90, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',285352.694758942,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',91, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',5708.08509298664,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',92, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',21842.7989163135,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',93, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',28229.795227441,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',94, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',95670.4298535617,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',95, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',152143.528140683,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',96, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',91472.6981830264,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',97, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',77924.4283005794,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',98, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',473581.834925068,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',99, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',532510.023862922,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',100, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',8552.13089772666,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',101, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',22242.9278918646,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',102, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',37415.7006313541,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',103, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',122947.539854023,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',104, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',226999.914160667,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',105, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',143245.981549776,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',106, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',90438.5033243647,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',107, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',705720.767210406,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-12-31',108, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',796069.954253817,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-09-30',55, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',22804.7927021297,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',56, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',123199.800914877,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',57, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',97056.7377564719,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',58, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',160757.92150044,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',59, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',323731.87095171,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',60, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',140891.587350851,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',61, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',130938.777497766,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',62, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',526140.852643953,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',63, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',275636.02320164,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',64, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',24182.4168113456,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',65, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',88793.9436832927,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',66, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',91046.1355415068,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',67, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',146219.122419721,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',68, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',341859.253447677,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',69, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',156158.523090381,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',70, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',107556.756359196,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',71, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',554918.953777081,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',72, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',291641.345919037,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',73, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',4262.3677879794,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',74, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',23026.8641229967,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',75, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',18140.551331603,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',76, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',30046.7272479089,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',77, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',60507.6448933475,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',78, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',26333.5769531231,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',79, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',24473.3304395159,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',80, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',98339.2329648392,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',81, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',51518.2103098745,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',82, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',5360.89634397801,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',83, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',19684.3488296762,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',84, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',20183.6275904729,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',85, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',32414.6905958462,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',86, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',75785.3127857292,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',87, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',34618.1137330933,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',88, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',23843.7963597428,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',89, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',123017.604638753,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',90, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',64652.7200853089,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',91, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',3339.22977939719,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',92, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',18039.7361819625,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',93, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',14211.694587221,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',94, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',23539.2465855711,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',95, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',47402.9787572223,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',96, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',20630.2854971606,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',97, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',19172.9287264063,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',98, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',77041.051249812,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-09-30',99, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',40360.4640906721,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',100, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',5002.99657517009,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',101, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',18370.1984631635,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',102, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',18836.1447844586,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',103, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',30250.6475840343,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',104, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',70725.7958347036,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',105, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',32306.9675913556,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',106, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',22251.9563656267,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',107, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',114804.804122853,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-12-31',108, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',60336.4281657071,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+ 									
+union all select '2022-10-31',109, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',31819.5719160986,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',110, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',159792.915624007,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',111, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',188128.59979559,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',112, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',461717.543178625,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',113, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',574580.465884658,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',114, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',261007.607407053,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',115, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',459096.675402265,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',116, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1162441.68133946,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',117, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',469809.49423339,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',118, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',33741.7735335002,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',119, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',115167.744148471,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',120, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',176478.03122335,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',121, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',419960.231752458,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',122, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',606754.128147759,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',123, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',289290.249719038,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',124, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',377114.787576205,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',125, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',1226023.25668918,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',126, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',497089.863771308,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',127, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',7286.09878287077,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',128, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',28082.4830974923,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',129, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',66943.2689565177,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',130, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',103785.805642473,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',131, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',327793.843884078,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',132, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',63621.6357060777,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',133, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',84534.4751014899,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',134, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',657794.550356181,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',135, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',227381.927963478,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',136, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',9163.92537432138,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',137, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',24006.1082717061,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',138, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',74482.7423162902,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',139, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',111965.098574106,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',140, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',410559.013357378,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',141, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',83636.9865240515,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',142, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',82359.9719980551,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',143, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',822869.037001499,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',144, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',285352.694758942,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',145, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',5708.08509298664,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',146, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',21842.7989163135,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',147, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',28229.795227441,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',148, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',95670.4298535617,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',149, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',152143.528140683,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',150, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',91472.6981830264,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',151, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',77924.4283005794,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',152, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',473581.834925068,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',153, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',532510.023862922,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',154, 'tmp', 'ENT', 'APAC','eb','TRUE', 'tmp',8552.13089772666,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',155, 'tmp', 'MM', 'APAC','eb','TRUE', 'tmp',22242.9278918646,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',156, 'tmp', 'SB', 'APAC','eb','TRUE', 'tmp',37415.7006313541,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',157, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'tmp',122947.539854023,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',158, 'tmp', 'MM', 'EMEA','eb','TRUE', 'tmp',226999.914160667,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',159, 'tmp', 'SB', 'EMEA','eb','TRUE', 'tmp',143245.981549776,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',160, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'tmp',90438.5033243647,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',161, 'tmp', 'MM', 'NAMER','eb','TRUE', 'tmp',705720.767210406,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2023-01-31',162, 'tmp', 'SB', 'NAMER','eb','TRUE', 'tmp',796069.954253817,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'pipeline forecast' 									
+union all select '2022-10-31',109, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',30406.3902695063,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',110, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',164266.401219837,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',111, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',129408.983675296,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',112, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',214343.89533392,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',113, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',431642.49460228,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',114, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',187855.449801135,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',115, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',174585.036663689,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',116, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',701521.136858605,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',117, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',367514.697602187,'2022-10-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',118, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',32243.2224151274,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',119, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',118391.924911057,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',120, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',121394.847388676,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',121, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',194958.829892961,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',122, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',455812.337930236,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',123, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',208211.364120508,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',124, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',143409.008478928,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',125, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',739891.938369441,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',126, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',388855.12789205,'2023-01-31', 'Expansion', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',127, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',5683.1570506392,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',128, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',30702.4854973289,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',129, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',24187.4017754706,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',130, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',40062.3029972118,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',131, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',80676.8598577967,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',132, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',35111.4359374974,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',133, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',32631.1072526878,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',134, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',131118.977286452,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',135, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',68690.9470798327,'2022-10-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',136, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',7147.86179197068,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',137, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',26245.7984395683,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',138, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',26911.5034539639,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',139, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',43219.5874611282,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',140, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',101047.083714306,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',141, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',46157.4849774577,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',142, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',31791.7284796571,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',143, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',164023.472851671,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',144, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',86203.6267804118,'2023-01-31', 'Cross-sell', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',145, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',4452.30637252958,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',146, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',24052.9815759499,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',147, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',18948.9261162947,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',148, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',31385.6621140947,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',149, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',63203.9716762964,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',150, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',27507.0473295475,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',151, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',25563.9049685417,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',152, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',102721.401666416,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2022-10-31',153, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',53813.9521208962,'2022-10-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',154, 'tmp', 'ENT', 'APAC','eb','TRUE', 'Closed Won',6670.66210022679,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',155, 'tmp', 'MM', 'APAC','eb','TRUE', 'Closed Won',24493.5979508847,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',156, 'tmp', 'SB', 'APAC','eb','TRUE', 'Closed Won',25114.8597126115,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',157, 'tmp', 'ENT', 'EMEA','eb','TRUE', 'Closed Won',40334.1967787124,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',158, 'tmp', 'MM', 'EMEA','eb','TRUE', 'Closed Won',94301.0611129382,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',159, 'tmp', 'SB', 'EMEA','eb','TRUE', 'Closed Won',43075.9567884742,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',160, 'tmp', 'ENT', 'NAMER','eb','TRUE', 'Closed Won',29669.275154169,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',161, 'tmp', 'MM', 'NAMER','eb','TRUE', 'Closed Won',153073.072163803,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									
+union all select '2023-01-31',162, 'tmp', 'SB', 'NAMER','eb','TRUE', 'Closed Won',80448.5708876095,'2023-01-31', 'Upgrade', 'Contract- New & Existing', 'revenue forecast' 									 									
+
+
+--Renewal Targets
+-- union all select '2022-10-31',1, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',2, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	166838.52	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',3, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	116990.28	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',4, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	181078.28	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',5, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	490663.37	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',6, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	608991.07	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',7, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	281301.33	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',8, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	728422.46	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2022-10-31',9, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	601357.33	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',10, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',11, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	86029.17	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',12, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	89075.77	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',13, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	566647.49	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',14, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	544074.37	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',15, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	557931.94	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',16, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	570508.41	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',17, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	713496.33	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+-- union all select '2023-01-31',18, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	704804.42	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',1, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',2, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	50051.56	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',3, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	35097.08	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',4, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	54323.48	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',5, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	147199.01	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',6, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	182697.32	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',7, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	84390.40	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',8, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	218526.74	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-08-31',9, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	180407.20	,'2022-08-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',28, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',29, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	25808.75	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',30, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	26722.73	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',31, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	169994.25	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',32, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	163222.31	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',33, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	167379.58	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',34, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	171152.52	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',35, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	214048.90	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-11-30',36, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	211441.33	,'2022-11-30'	, null	, 'Renewal'	,'revenue forecast'
+					
+union all select '2022-09-30',10, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',11, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	50051.56	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',12, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	35097.08	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',13, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	54323.48	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',14, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	147199.01	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',15, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	182697.32	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',16, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	84390.40	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',17, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	218526.74	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-09-30',18, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	180407.20	,'2022-09-30'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',37, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',38, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	25808.75	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',39, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	26722.73	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',40, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	169994.25	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',41, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	163222.31	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',42, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	167379.58	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',43, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	171152.52	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',44, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	214048.90	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-12-31',45, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	211441.33	,'2022-12-31'	, null	, 'Renewal'	,'revenue forecast'
+					
+union all select '2022-10-31',19, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',20, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	66735.41	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',21, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	46796.11	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',22, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	72431.31	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',23, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	196265.35	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',24, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	243596.43	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',25, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	112520.53	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',26, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	291368.98	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2022-10-31',27, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	240542.93	,'2022-10-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',46, 'tmp', 'ENT', 'APAC','eb','FALSE', 'tmp',	0.00	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',47, 'tmp', 'MM', 'APAC','eb','FALSE', 'tmp',	34411.67	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',48, 'tmp', 'SB', 'APAC','eb','FALSE', 'tmp',	35630.31	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',49, 'tmp', 'ENT', 'EMEA','eb','FALSE', 'tmp',	226659.00	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',50, 'tmp', 'MM', 'EMEA','eb','FALSE', 'tmp',	217629.75	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',51, 'tmp', 'SB', 'EMEA','eb','FALSE', 'tmp',	223172.77	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',52, 'tmp', 'ENT', 'NAMER','eb','FALSE', 'tmp',	228203.37	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',53, 'tmp', 'MM', 'NAMER','eb','FALSE', 'tmp',	285398.53	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+union all select '2023-01-31',54, 'tmp', 'SB', 'NAMER','eb','FALSE', 'tmp',	281921.77	,'2023-01-31'	, null	, 'Renewal'	,'revenue forecast'
+)
+,forecast_dates_w_opps as (
+	Select 
+		   --opp.created_at::DATE
+		   opp.close_date::DATE
+		 , opp.opportunity_id
+		 , opp.opportunity_assigned_owner_role
+		 , 'tmp' as company_reporting_segment
+		 , opportunity_assigned_owner_sales_region
+		 , CAST('tmp' as varchar) as rev_classifier
+		 , is_an_amendment
+		 , stage_name
+		 , 0 as quote_line_arr
+		 , opp.contracted_renewal_date
+		 , CAST('tmp' as varchar) as expansion_category_type
+		 , opp.opp_record_type_name
+		 , NULL as data_type
+	From base.salesforce_opportunity opp	 
+	Where 1=1
+		and opp.close_date >= '2020-02-01' 
+	    and opp.opportunity_assigned_owner_role is not null
+UNION ALL
+	Select  
+ 		    close_date::DATE
+		  , opportunity_id::VARCHAR
+		  , opportunity_assigned_owner_role
+		  , company_reporting_segment
+  		  , opportunity_assigned_owner_sales_region
+		  , rev_classifier
+		  , is_an_amendment
+		  , stage_name
+		  , quote_line_arr
+		  , contracted_renewal_date
+		  , expansion_category_type
+		  , opp_record_type_name
+		  , data_type
+	FROM forecast_date
+ 
+),	
+
+quote_line as (
+Select 
+        NVL(fdwo.data_type,'Quote Line') as data_type
+		,fdwo.opportunity_id
+		,opp.opportunity_name
+		,fdwo.close_date
+		,bsa.account_name
+		,bsa.account_id
+		,bsa.account_company_reporting_segment as company_reporting_segment
+		,opp.app_id
+        ,opp.opportunity_primary_app_id
+		,opp.forecast_category_name
+		,opp.opportunity_type
+		,fdwo.is_an_amendment
+		,fdwo.opp_record_type_name
+		,fdwo.stage_name
+		,opp.is_closed
+		,opp.is_won
+		,opp.opportunity_assigned_owner
+		,fdwo.opportunity_assigned_owner_role
+		,opp.opportunity_assigned_owner_manager
+		,fdwo.opportunity_assigned_owner_sales_region
+		,opp.opportunity_assigned_sdr
+		,case
+		  when fdwo.opportunity_assigned_owner_role ilike '%ENT%' and data_type != 'Quote Line' then 'ENT'
+		  when fdwo.opportunity_assigned_owner_role ilike '%MM%' and data_type != 'Quote Line' then 'MM'
+  		  when fdwo.opportunity_assigned_owner_role ilike '%SB%' and data_type != 'Quote Line' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-ENT%' then 'ENT'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-SB%' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-MM%' then 'MM'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-ENT%' then 'ENT'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-SB%' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%-SMB%' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%SMB%' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%SMB %' then 'SB'
+		  when fdwo.opportunity_assigned_owner_role ilike '%Growth%' then 'CGAE'
+		  else null end as segment
+		
+		-- ,IF CONTAINS(fdwo.opportunity_assigned_owner_role,"ENT") THEN 'ENT' 
+  --   ELSEIF CONTAINS(fdwo.opportunity_assigned_owner_role,"MM") THEN 'MM' 
+  --   ELSEIF CONTAINS(fdwo.opportunity_assigned_owner_role,"SB") THEN 'SB' 
+  --   ELSEIF CONTAINS(fdwo.opportunity_assigned_owner_role,"SMB") THEN 'SB' 
+  --   ELSEIF CONTAINS(fdwo.opportunity_assigned_owner_role,"SMB ") THEN 'SB' 
+  --   ELSEIF CONTAINS(fdwo.opportunity_assigned_owner_role,"Growth") THEN 'CGAE' 
+  --   ELSE 'SB'
+  --   END as segment
+		
+		,opp.opportunity_contracted_net_expansion_arr as opp_contracted_net_expansion_arr
+		,opp.opportunity_renewal_contracted_arr
+		,opp.contract_start_date
+		,fdwo.contracted_renewal_date
+		--,opp.contract_expiration_date
+		,opp.closed_lost_reason
+		,opp.closed_lost_details
+		,opp.opportunity_arr
+		
+		,opp.created_at::date as opp_created_date
+		,opp.discovery_qualified_timestamp::date as s2_entry_date
+		,opp.solution_review_timestamp::date as s3_entry_date
+		,opp.proposal_timestamp::date as s4_entry_date
+		,opp.contract_sent_timestamp::date as s5_entry_date
+		,opp.contract_signed_timestamp::date as s6_entry_date
+		,opp.close_date::date as s7_entry_date
+		,opp.closing_confirmed_timestamp::date as close_timestamp
+		   
+		,sq.quote_id
+		,sq.quote_type
+		,sq.price_book
+		,null as quote_contracted_amount
+		,sq.contract_term as quote_order_term
+		,sq.quote_status
+
+		,cnt.contract_id
+        ,opp.amended_contract_id
+		,opp.renewed_contract_id
+		,case when opp.is_outbound is true then 'OB' else 'IB' end as ib_or_ob
+		,NVL(case 
+			when 
+				(
+				opp.opportunity_assigned_owner_role ilike '%growth%'
+				--and opp.stage_name in ('Closed Won')    
+				and opp.subscription_type ilike '%Contract%'
+				and opp.opp_record_type_name != 'Month to Month'
+				and (opp.sops_tag != 'ae_hold' or opp.sops_tag is null)
+				) then 'cgae'
+			when 
+				(
+					(opp.opp_record_type_name = 'Renewal' 
+					and (opp.closed_lost_details not in ('Sales Ops Cleanup', 'Duplicate') or opp.closed_lost_details is null)
+					--and opp.stage_name in ('Closed Won', 'Closed Lost', 'Closed Auto Renewed')
+					)
+				or 
+					(opp.opp_record_type_name = 'Contract - New & Existing'
+					--and opp.stage_name in ('Closed Won')
+					)
+				)
+				and opp.opportunity_assigned_owner_role ilike '%RM%'
+				and sma.account_id is not null
+				then 'eb'
+
+			when
+				(
+				opp.opportunity_assigned_owner_role ilike '%AE%'
+				--and opp.stage_name in ('Closed Won', 'RTS - Closed Won')
+				and (opp.revenue_stream_type in ('New Business') or opp.revenue_stream_type is null)
+				) then 'nb'
+			else null end,fdwo.rev_classifier) as rev_classifier
+
+		--Comprehensive joined fields        
+		,cb.tenure_months
+		,cb.price_plan as comprehensive_price_plan
+		,cb.price_plan_group as comprehensive_price_plan_group
+		,cb.eop_arr as comprehensive_eop_arr
+		,cb.sales_provisioned_at_acquisition as sales_provisioned_at_acquisition
+		,cb.industry_primary as comprehensive_industry_primary
+		,cb.inbox_tier as comprehensive_inbox_tier
+		,cb.vbp_core_tier as comprehensive_vbp_core_tier
+	
+		,sql.quote_name
+		,sql.quote_line_product_name
+		,sql.quote_line_product_id
+		,sql.quote_line_product_option_id
+		,sql.quote_line_product_family
+		,sql.quote_line_net_price_total
+		,sql.quote_line_quantity
+		,sql.quote_amendment_quantity
+		,sql.quote_prior_quantity
+		,NVL((sql.quote_line_list_price_total / sql.quote_line_subscription_term ) * 12 * (1-(sql.quote_line_total_discount_rate/100)),fdwo.quote_line_arr) as quote_line_arr
+		,sql.quote_line_pricing_method
+		,rq.req_quote_name
+
+        ,fdwo.expansion_category_type 
+ 
+
+	From forecast_dates_w_opps fdwo 
+	left join base.salesforce_opportunity opp on fdwo.opportunity_id = opp.opportunity_id
+	left join all_sales_managed_accounts sma on sma.account_id = opp.account_id
+	left join base.salesforce_account bsa on bsa.account_id = opp.account_id
+	left join base.salesforce_quote sq on sq.opportunity_id = opp.opportunity_id  and sq.is_primary_quote is true
+	left join base.salesforce_quote_line sql on sql.quote_id = sq.quote_id
+	
+	left join (
+		Select cb.account_id
+		,cb.price_plan
+		,cb.price_plan_group
+		,cb.eop_arr
+		,cb.tenure_months
+					,cb.sales_provisioned_at_acquisition
+					,cb.is_cgae_transitioned_account as is_cgrm_transitioned
+					,cb.industry_primary
+					,cb.inbox_tier
+					,cb.vbp_core_tier
+		,row_number() Over( Partition by cb.account_id Order by date DESC) as opp_comprehensive_ranker 
+		From base.salesforce_opportunity opp
+		Left Join dw.finance_analysis_apps_comprehensive_build cb on cb.account_id = opp.account_id and dateadd(day,-1,opp.close_date) = cb.date and cb.subscription_type = 'annual_primary'
+		) cb on cb.account_id = opp.account_id and cb.opp_comprehensive_ranker = 1
+	
+	left join (SELECT DISTINCT quote_id, quote_name, MAX (req_name) over (partition by quote_name) req_quote_name
+		from (
+		SELECT a.quote_id, a.quote_name, b.quote_name req_name
+		FROM base.salesforce_quote_line a
+		LEFT JOIN  (SELECT * from base.salesforce_quote_line WHERE quote_line_product_family is NULL ) b 
+		on a.quote_id = b.quote_id 
+		where 1=1
+		and a.quote_name  >= b.quote_name ) c ) rq on sql.quote_id = rq.quote_id and sql.quote_name = rq.quote_name
+        
+        left join base.salesforce_contract cnt on opp.opportunity_id = cnt.opportunity_id
+
+	  Where 1=1
+		  --and opp.is_an_amendment = TRUE
+		  --and fdwo.close_date >= '2021-04-01'
+                  --and app_id = 543535
+
+)
+
+-- select *, sum(quote_line_arr) over (partition by close_date) as arr_sum
+-- from quote_line 
+-- where 1=1 and rev_classifier is not NULL
+-- and data_type = 'revenue forecast'
+-- order by close_date desc
+-- limit 100
+
+-- select * from forecast_date
+select * from quote_line where 1=1 and rev_classifier is not NULL
