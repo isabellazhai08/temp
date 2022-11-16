@@ -1,0 +1,126 @@
+with cte5 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as pro_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Inbox Pro' and date < '2022-11-01'),
+
+cte6 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as premium_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Inbox Premium' and date < '2022-11-01'
+)
+
+,cte_inbox as (
+-- select max(premium_desc) as product, sum(case when premium_arr > product_eop_arr then premium_arr - product_eop_arr else premium_arr-0 end) as message_upgrade_sum
+-- from(
+select distinct cte5.date, cte5.app_id, cte5.product_rate_plan_name, cte5.product_rate_plan_desc, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc
+-- select distinct cte5.*, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc, cte6.product_eop_arr as premium_arr, cte6.premium_rank as premium_rank, cte6.product_eop_arr - cte5.product_eop_arr as arr_increment
+from cte5 inner join cte6 on cte5.app_id = cte6.app_id
+where premium_date - cte5.date = 1)
+
+
+,cte1 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as pro_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Messages Pro' and date < '2022-11-01'),
+
+cte2 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as premium_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Messages Premium' and date < '2022-11-01'
+)
+
+,cte_msg as (
+-- select max(premium_desc) as product, sum(case when premium_arr > product_eop_arr then premium_arr - product_eop_arr else premium_arr-0 end) as message_upgrade_sum
+-- from(
+select distinct cte1.date, cte1.app_id, cte1.product_rate_plan_name, cte1.product_rate_plan_desc, cte2.date as premium_date, cte2.product_rate_plan_desc as premium_desc
+-- select distinct cte5.*, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc, cte6.product_eop_arr as premium_arr, cte6.premium_rank as premium_rank, cte6.product_eop_arr - cte5.product_eop_arr as arr_increment
+from cte1 inner join cte2 on cte1.app_id = cte2.app_id
+where premium_date - cte1.date = 1
+-- order by app_id
+-- order by arr_increment desc
+)
+
+,cte3 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as pro_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Support Pro' and date < '2022-11-01'),
+
+cte4 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as premium_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Support Premium' and date < '2022-11-01'
+)
+
+,cte_support as (
+-- select max(premium_desc) as product, sum(case when premium_arr > product_eop_arr then premium_arr - product_eop_arr else premium_arr-0 end) as message_upgrade_sum
+-- from(
+select distinct cte3.date, cte3.app_id, cte3.product_rate_plan_name, cte3.product_rate_plan_desc, cte4.date as premium_date, cte4.product_rate_plan_desc as premium_desc
+-- select distinct cte5.*, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc, cte6.product_eop_arr as premium_arr, cte6.premium_rank as premium_rank, cte6.product_eop_arr - cte5.product_eop_arr as arr_increment
+from cte3 inner join cte4 on cte3.app_id = cte4.app_id
+where premium_date - cte3.date = 1)
+
+
+,cte7 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as pro_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Engage Pro' and date < '2022-11-01'),
+
+cte8 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as premium_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Engage Premium' and date < '2022-11-01'
+)
+
+,cte_engage as (
+-- select max(premium_desc) as product, sum(case when premium_arr > product_eop_arr then premium_arr - product_eop_arr else premium_arr-0 end) as message_upgrade_sum
+-- from(
+select distinct cte7.date, cte7.app_id, cte7.product_rate_plan_name, cte7.product_rate_plan_desc, cte8.date as premium_date, cte8.product_rate_plan_desc as premium_desc
+-- select distinct cte5.*, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc, cte6.product_eop_arr as premium_arr, cte6.premium_rank as premium_rank, cte6.product_eop_arr - cte5.product_eop_arr as arr_increment
+from cte7 inner join cte8 on cte7.app_id = cte8.app_id
+where premium_date - cte7.date = 1)
+
+,cte9 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as pro_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Accelerate plano' and date < '2022-11-01'),
+
+cte0 as (
+SELECT distinct *, dense_rank() over (partition by app_id order by date desc) as premium_rank
+from dw.finance_analysis_product_arr 
+where date >= '2021-08-01' and product_rate_plan_desc = 'Scale plan' and date < '2022-11-01'
+)
+
+,cte_scale as (
+-- select max(premium_desc) as product, sum(case when premium_arr > product_eop_arr then premium_arr - product_eop_arr else premium_arr-0 end) as message_upgrade_sum
+-- from(
+select distinct cte9.date, cte9.app_id, cte9.product_rate_plan_name, cte9.product_rate_plan_desc, cte0.date as premium_date, cte0.product_rate_plan_desc as premium_desc
+-- select distinct cte5.*, cte6.date as premium_date, cte6.product_rate_plan_desc as premium_desc, cte6.product_eop_arr as premium_arr, cte6.premium_rank as premium_rank, cte6.product_eop_arr - cte5.product_eop_arr as arr_increment
+from cte9 inner join cte0 on cte9.app_id = cte0.app_id
+where premium_date - cte9.date = 1)
+
+
+,cte as (
+select * from cte_engage
+union all 
+select * from cte_support
+union all 
+select * from cte_inbox
+union all
+select * from cte_msg
+union all
+select * from cte_scale)
+
+,res as (
+select distinct a.*
+-- , opp.account_id, opp.opportunity_id
+from (
+select *, row_number() over (partition by app_id, product_rate_plan_desc order by date desc) as rn
+from cte
+)a
+-- inner join base.salesforce_opportunity  opp on opp.app_id = a.app_id
+-- inner join base.salesforce_account act on act.account_id = opp.account_id
+where rn = 1)
+
+select distinct res.*, opp.account_id, act.account_name from res 
+left join base.salesforce_opportunity opp on res.app_id = opp.app_id
+left join base.salesforce_account act on act.account_id = opp.account_id
